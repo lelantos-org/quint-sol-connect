@@ -139,18 +139,57 @@ abstract contract QuintReplayBase is Test {
         console2.log("");
         console2.log("  ENABLEDNESS DIVERGENCE");
         console2.log("    the model enabled `%s` at step %s; the implementation reverted", action, vm.toString(_stepIndex));
-        console2.log("    revert : %s", vm.toString(ret));
-        if (ret.length == 0) {
-            console2.log("    (empty revert data: out of gas, an assert, or a bare `revert()`)");
+        string memory message = _revertMessage(ret);
+        if (bytes(message).length != 0) {
+            console2.log("    revert : %s", message);
+        } else if (ret.length == 0) {
+            console2.log("    revert : (no data: out of gas, an assert, or a bare `revert()`)");
+        } else {
+            console2.log("    revert : %s", vm.toString(ret));
         }
         console2.log("    spec   : %s", _meta.spec);
         console2.log("    trace  : %s", _tracePath);
         console2.log("    itf    : %s", _meta.itf);
         console2.log("");
-        console2.log("  This is usually the model missing a guard the implementation has.");
+        console2.log("  Either the model is missing a guard the implementation has, or the");
+        console2.log("  implementation gained one the model does not know about. A negative");
+        console2.log("  action whose `expectRevert` did not fire lands here too.");
         console2.log("  reproduce:");
         console2.log("    QUINT_VERBOSE=2 forge test --match-test %s -vvvv", _meta.testName);
         fail();
+    }
+
+
+    /// Best-effort decoding of revert data into something readable.
+    ///
+    /// Covers the `(offset, length, bytes)` tail shared by `Error(string)` and
+    /// by every custom error carrying a single string — which includes the
+    /// cheatcode failure raised when an `expectRevert` does not fire, the most
+    /// likely way a negative action fails. Also names `Panic`. Returns the empty
+    /// string when the payload is not one of those, so the caller falls back to
+    /// printing raw bytes rather than inventing a message.
+    function _revertMessage(bytes memory ret) internal pure returns (string memory) {
+        if (ret.length == 4 + 32 && bytes4(_word(ret, 0)) == bytes4(0x4e487b71)) {
+            return string.concat("Panic(", vm.toString(uint256(_word(ret, 4))), ")");
+        }
+        if (ret.length < 4 + 64) return "";
+        if (uint256(_word(ret, 4)) != 32) return "";
+
+        uint256 len = uint256(_word(ret, 36));
+        if (len == 0 || ret.length < 68 + len) return "";
+
+        bytes memory out = new bytes(len);
+        for (uint256 i = 0; i < len; i++) {
+            out[i] = ret[68 + i];
+        }
+        return string(out);
+    }
+
+    /// The 32 bytes of `data` starting at `offset`.
+    function _word(bytes memory data, uint256 offset) private pure returns (bytes32 w) {
+        for (uint256 i = 0; i < 32 && offset + i < data.length; i++) {
+            w |= bytes32(data[offset + i]) >> (i * 8);
+        }
     }
 
     /// Dispatch goes through an external self-call so a revert can be caught
