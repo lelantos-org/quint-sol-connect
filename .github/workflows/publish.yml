@@ -1,0 +1,68 @@
+name: publish
+
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: publish-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      packages: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+          registry-url: https://npm.pkg.github.com
+          scope: "@lelantos-org"
+          always-auth: true
+
+      # A tag that disagrees with package.json publishes a version nobody can
+      # find from the tag, and the registry will not let it be republished under
+      # the right number. Cheaper to refuse here.
+      - name: Confirm tag version matches package.json
+        env:
+          TAG: ${{ github.ref_name }}
+        run: |
+          set -euo pipefail
+          case "$TAG" in
+            v*) version="${TAG#v}" ;;
+            *)
+              echo "::error::tag '$TAG' is not of the form v<version>"
+              exit 1
+              ;;
+          esac
+          pkg=$(node -p "require('./package.json').version")
+          if [ "$version" != "$pkg" ]; then
+            echo "::error::tag '$TAG' implies version $version, but package.json is $pkg"
+            exit 1
+          fi
+          echo "tag '$TAG' matches package.json version $pkg"
+
+      - uses: foundry-rs/foundry-toolchain@v1
+
+      - uses: extractions/setup-just@v2
+
+      - run: just install
+
+      # The full gate, not just the unit tests: a release that cannot replay its
+      # own example is not a release. `prepack` re-runs the unit tests during
+      # publish as a second line.
+      - run: just ci
+
+      - name: Publish to GitHub Packages
+        run: npm publish
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}

@@ -292,6 +292,20 @@ just install    # npm ci, including the pinned quint
 just ci         # unit tests, drift check, determinism check, example replay
 ```
 
+## Releasing
+
+Publishing is a tag, not a command. `.github/workflows/publish.yml` runs the
+full gate and publishes to GitHub Packages on any `v*` tag, and refuses a tag
+that disagrees with `package.json`:
+
+```bash
+npm version patch      # or minor / major
+git push --follow-tags
+```
+
+Consumers pinning by git submodule are on the commit, not the version, so a
+release is only load-bearing for the npm channel.
+
 ## License
 
 Apache-2.0, matching upstream quint-connect.
