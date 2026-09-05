@@ -11,6 +11,8 @@
  * a failure name a single trace you can rerun on its own.
  */
 
+import { PICKS_FILLER } from '../lower.mjs';
+
 const HEADER = (model, cmd) =>
   `// SPDX-License-Identifier: Apache-2.0\n` +
   `pragma solidity ${model.pragma};\n\n` +
@@ -29,9 +31,10 @@ export function emitSpecLibrary(model, cmd) {
   const L = [];
   L.push(HEADER(model, cmd));
   L.push(`library ${model.lib} {`);
-  L.push(`    /// keccak256 of the canonical ABI type string for \`Step[]\`.`);
-  L.push(`    /// Asserted against every fixture's \`meta.schemaHash\` before decoding, so a`);
-  L.push(`    /// config change that was not followed by a regeneration fails by name.`);
+  L.push(`    /// keccak256 of the canonical ABI type string for \`Step[]\`, and of the action`);
+  L.push(`    /// names - which are not part of that string, but decide what each recorded`);
+  L.push(`    /// \`uint8\` tag means. Asserted against every fixture's \`meta.schemaHash\` before`);
+  L.push(`    /// decoding, so a config change not followed by a regeneration fails by name.`);
   L.push(`    bytes32 internal constant SCHEMA_HASH = ${model.schemaHash};`);
   L.push('');
   L.push(`    /// ${model.canonical}`);
@@ -72,7 +75,7 @@ export function emitSpecLibrary(model, cmd) {
     L.push(`        bool has${cap(p.name)};`);
     L.push(`        ${p.node.solType} ${p.name};`);
   }
-  if (model.picks.length === 0) L.push('        bool unused;');
+  if (model.picks.length === 0) L.push(`        bool ${PICKS_FILLER};`);
   L.push('    }');
   L.push('');
 

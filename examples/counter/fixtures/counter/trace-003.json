@@ -12,7 +12,7 @@
       "touch",
       "finish"
     ],
-    "schemaHash": "0x90ae0031a69509ab256085674d96c954936bb0d03d883fd4e83ad784ddf2d3b0",
+    "schemaHash": "0xf2540d2a0249844f378a4fc993bf69b0247658ace9f4dc01ec1651afba50aff0",
     "testName": "test_quint_counter_003",
     "itf": "examples/counter/fixtures/counter/trace-003.itf.json"
   },

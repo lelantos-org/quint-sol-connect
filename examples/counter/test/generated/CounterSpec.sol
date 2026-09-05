@@ -5,10 +5,11 @@ pragma solidity ^0.8.20;
 // Do not edit. Regenerate with `quint-sol-connect gen counter`.
 
 library CounterSpec {
-    /// keccak256 of the canonical ABI type string for `Step[]`.
-    /// Asserted against every fixture's `meta.schemaHash` before decoding, so a
-    /// config change that was not followed by a regeneration fails by name.
-    bytes32 internal constant SCHEMA_HASH = 0x90ae0031a69509ab256085674d96c954936bb0d03d883fd4e83ad784ddf2d3b0;
+    /// keccak256 of the canonical ABI type string for `Step[]`, and of the action
+    /// names - which are not part of that string, but decide what each recorded
+    /// `uint8` tag means. Asserted against every fixture's `meta.schemaHash` before
+    /// decoding, so a config change not followed by a regeneration fails by name.
+    bytes32 internal constant SCHEMA_HASH = 0xf2540d2a0249844f378a4fc993bf69b0247658ace9f4dc01ec1651afba50aff0;
 
     /// (uint8,(bool,uint256,bool,uint256),(uint256,uint8,uint256[],(uint256,uint256,bool)[]))[]
     string internal constant CANONICAL_TYPE =

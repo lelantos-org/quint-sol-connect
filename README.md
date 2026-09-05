@@ -84,7 +84,7 @@ arbitrary keys — so someone has to choose a width and an order. That choice is
 explicit:
 
 ```js
-// quint-connect.config.mjs
+// quint-sol-connect.config.mjs
 export default {
   specs: {
     counter: {

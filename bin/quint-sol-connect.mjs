@@ -9,99 +9,92 @@
 
 import fs from 'node:fs';
 import path from 'node:path';
+import { Command, InvalidArgumentError } from 'commander';
 
 import { loadConfig, buildModels } from '../src/config.mjs';
 import { generateSpec, coverageReport, resolveQuint, quintVersion, TOOL_VERSION } from '../src/gen.mjs';
 import { checkModel } from '../src/check.mjs';
 import { emitDriverStub } from '../src/emit/scaffold.mjs';
 
-const USAGE = `quint-sol-connect ${TOOL_VERSION}
-
-  quint-sol-connect gen [specs...] [options]
-      Regenerate trace fixtures and generated Solidity.
-      --fresh          random seed instead of the config's pinned one
-      --out DIR        write fixtures here instead of the configured path
-      --traces N       override run.traces
-      --steps N        override run.maxSteps
-      --samples N      override run.maxSamples
-      --seed X         override run.seed
-
-  quint-sol-connect check [specs...]
-      Verify committed fixtures and Solidity still match the config. No quint.
-
-  quint-sol-connect scaffold <spec>
-      Write a driver stub for a spec. Never overwrites an existing file.
-
-  Common options:
-      --config FILE    config path (default: quint-connect.config.mjs)
-      --root DIR       project root (default: cwd)
-      --runtime PATH   Solidity import prefix for the package's own contracts
-                       (default: quint-sol-connect)
-`;
-
-function parseArgs(argv) {
-  const opts = { _: [], flags: {} };
-  for (let i = 0; i < argv.length; i++) {
-    const a = argv[i];
-    if (!a.startsWith('--')) {
-      opts._.push(a);
-      continue;
-    }
-    const key = a.slice(2);
-    if (key === 'fresh') opts.flags.fresh = true;
-    else opts.flags[key] = argv[++i];
+/** A positive integer option, rejected at parse time rather than deep in quint. */
+function positiveInt(value) {
+  const n = Number(value);
+  if (!Number.isInteger(n) || n < 1) {
+    throw new InvalidArgumentError(`expected a positive integer, got "${value}"`);
   }
-  return opts;
+  return n;
 }
 
-const die = (msg) => {
-  console.error(`quint-sol-connect: ${msg}`);
-  process.exit(1);
-};
+const program = new Command();
 
-async function main() {
-  const [command, ...rest] = process.argv.slice(2);
-  if (!command || command === '--help' || command === '-h') {
-    console.log(USAGE);
-    return;
-  }
+program
+  .name('quint-sol-connect')
+  .description('Model-based testing for Solidity: replay Quint traces inside Foundry.')
+  .version(TOOL_VERSION)
+  // Inherited so they can be written either before or after the subcommand.
+  .option('-c, --config <file>', 'config path (default: quint-sol-connect.config.mjs)')
+  .option('-r, --root <dir>', 'project root (default: the working directory)')
+  .option(
+    '--runtime <prefix>',
+    "Solidity import prefix for the package's own contracts",
+    'quint-sol-connect',
+  )
+  .enablePositionalOptions()
+  .showHelpAfterError();
 
-  const { _: names, flags } = parseArgs(rest);
-  const root = path.resolve(flags.root ?? process.cwd());
-  const runtimeImport = flags.runtime ?? 'quint-sol-connect';
+/** Options declared on the root command, resolved for whichever subcommand ran. */
+function common(command) {
+  const opts = command.optsWithGlobals();
+  return {
+    root: path.resolve(opts.root ?? process.cwd()),
+    configFile: opts.config,
+    runtimeImport: opts.runtime,
+  };
+}
 
-  const { config, file } = await loadConfig(root, flags.config);
+program
+  .command('gen')
+  .description('regenerate trace fixtures and generated Solidity')
+  .argument('[specs...]', 'spec names from the config (default: all)')
+  .option('--fresh', "use a random seed instead of the config's pinned one")
+  .option('--out <dir>', 'write fixtures here instead of the configured path')
+  .option('--traces <n>', 'override run.traces', positiveInt)
+  .option('--steps <n>', 'override run.maxSteps', positiveInt)
+  .option('--samples <n>', 'override run.maxSamples', positiveInt)
+  .option('--seed <hex>', 'override run.seed')
+  .action(async (specs, opts, command) => {
+    const { root, configFile, runtimeImport } = common(command);
+    const { config } = await loadConfig(root, configFile);
+    const models = buildModels(config, specs);
 
-  if (command === 'gen') {
-    const models = buildModels(config, names);
     const quintBin = resolveQuint(config.quintBin);
     const quintVer = quintVersion(quintBin);
 
     const runOverride = {};
-    if (flags.traces) runOverride.traces = Number(flags.traces);
-    if (flags.steps) runOverride.maxSteps = Number(flags.steps);
-    if (flags.samples) runOverride.maxSamples = Number(flags.samples);
-    if (flags.seed) runOverride.seed = flags.seed;
+    if (opts.traces) runOverride.traces = opts.traces;
+    if (opts.steps) runOverride.maxSteps = opts.steps;
+    if (opts.samples) runOverride.maxSamples = opts.samples;
+    if (opts.seed) runOverride.seed = opts.seed;
 
-    let dead = false;
+    let sawDeadAction = false;
+
     for (const model of models) {
-      const cmd = `quint-sol-connect gen ${model.name}`;
       const summary = generateSpec(model, {
         root,
         quintBin,
         quintVer,
-        fresh: Boolean(flags.fresh),
-        outOverride: flags.out,
+        fresh: Boolean(opts.fresh),
+        outOverride: opts.out,
         runOverride,
         runtimeImport,
-        cmd,
+        cmd: `quint-sol-connect gen ${model.name}`,
         format: config.format,
       });
 
       const steps = summary.fixtures.reduce((n, f) => n + f.steps, 0);
       console.log(
-        `${model.name}: ${summary.fixtures.length} traces, ${steps} steps, seed ${summary.seed} ` +
-          `(quint ${quintVer})`,
+        `${model.name}: ${summary.fixtures.length} traces, ${steps} steps, ` +
+          `seed ${summary.seed} (quint ${quintVer})`,
       );
       console.log(`  fixtures -> ${summary.fixtureDir}`);
       console.log(
@@ -110,29 +103,39 @@ async function main() {
       if (summary.fmt && !summary.fmt.formatted) {
         console.log(`  note: not formatted - ${summary.fmt.reason}`);
       }
-      const { lines, dead: never } = coverageReport(summary);
+
+      const { lines, dead } = coverageReport(summary);
       for (const l of lines) console.log(l);
-      if (never.length) {
-        dead = true;
+      if (dead.length) {
+        sawDeadAction = true;
         console.error(
-          `\n  WARNING: ${never.join(', ')} never ran in any trace.\n` +
+          `\n  WARNING: ${dead.join(', ')} never ran in any trace.\n` +
             '  Either the action is unreachable in the spec (a guard that never holds), or it is\n' +
             '  configured but not in `step`. An action nothing exercises is coverage you do not have.',
         );
       }
       console.log('');
     }
-    if (dead && config.failOnDeadAction) process.exit(1);
-    return;
-  }
 
-  if (command === 'check') {
-    const models = buildModels(config, names);
+    if (sawDeadAction && config.failOnDeadAction) process.exitCode = 1;
+  });
+
+program
+  .command('check')
+  .description('verify committed fixtures and Solidity still match the config (no quint)')
+  .argument('[specs...]', 'spec names from the config (default: all)')
+  .action(async (specs, _opts, command) => {
+    const { root, configFile } = common(command);
+    const { config } = await loadConfig(root, configFile);
+    const models = buildModels(config, specs);
+
     let failed = false;
     for (const model of models) {
       const { problems, fixtures } = checkModel(model, root);
       if (problems.length === 0) {
-        console.log(`${model.name}: ok (${fixtures} traces, schema ${model.schemaHash.slice(0, 10)})`);
+        console.log(
+          `${model.name}: ok (${fixtures} traces, schema ${model.schemaHash.slice(0, 10)})`,
+        );
       } else {
         failed = true;
         console.error(`${model.name}: ${problems.length} problem(s)`);
@@ -141,31 +144,41 @@ async function main() {
     }
     if (failed) {
       console.error('\nRegenerate with `quint-sol-connect gen`.');
-      process.exit(1);
+      process.exitCode = 1;
     }
-    return;
-  }
+  });
 
-  if (command === 'scaffold') {
-    const [name] = names;
-    if (!name) die('scaffold needs a spec name');
+program
+  .command('scaffold')
+  .description('write a driver stub for a spec; never overwrites an existing file')
+  .argument('<spec>', 'spec name from the config')
+  .action(async (name, _opts, command) => {
+    const { root, configFile, runtimeImport } = common(command);
+    const { config, file } = await loadConfig(root, configFile);
     const [model] = buildModels(config, [name]);
-    if (!model.driver?.path) die(`spec "${name}" has no \`driver.path\` in ${file}`);
+
+    if (!model.driver?.path) {
+      throw new Error(`spec "${name}" has no \`driver.path\` in ${file}`);
+    }
     const target = path.resolve(root, model.driver.path);
     if (fs.existsSync(target)) {
-      die(`${model.driver.path} already exists; scaffold never overwrites a driver`);
+      throw new Error(`${model.driver.path} already exists; scaffold never overwrites a driver`);
     }
+
     fs.mkdirSync(path.dirname(target), { recursive: true });
     fs.writeFileSync(target, emitDriverStub(model, runtimeImport));
     console.log(`wrote ${model.driver.path}`);
     console.log('Fill in setUp, apply_ and _project, then run `quint-sol-connect gen`.');
-    return;
-  }
+  });
 
-  die(`unknown command "${command}"\n\n${USAGE}`);
+// Errors from the pipeline are diagnoses, not stack traces: config mistakes,
+// spec shapes --mbt cannot describe, values that do not fit their declared
+// width. Print the message and exit. `QCS_STACK=1` restores the stack when the
+// bug is in the tool itself rather than in what it was given.
+try {
+  await program.parseAsync(process.argv);
+} catch (e) {
+  if (process.env.QCS_STACK || !e?.message) throw e;
+  console.error(`quint-sol-connect: ${e.name && e.name !== 'Error' ? `${e.name}: ` : ''}${e.message}`);
+  process.exit(1);
 }
-
-main().catch((e) => {
-  if (e && e.name && e.message && !process.env.QCS_STACK) die(`${e.name}: ${e.message}`);
-  throw e;
-});

@@ -207,6 +207,14 @@ function sortCanonically(values, node, path) {
 }
 
 /**
+ * Solidity forbids an empty struct, so a spec where no action draws a nondet
+ * pick gets a single filler field in its `Picks`. The ABI tuple has to declare
+ * the same field: without it the encoder writes one word per step fewer than
+ * `abi.decode` reads, and every trace decodes as garbage rather than failing.
+ */
+export const PICKS_FILLER = 'unused';
+
+/**
  * Build the ABI parameter describing `Step[]`, plus the canonical type string
  * the generated Solidity hashes into `SCHEMA_HASH`.
  */
@@ -214,10 +222,12 @@ export function stepArrayAbi(model) {
   const picks = {
     type: 'tuple',
     name: 'picks',
-    components: model.picks.flatMap((p) => [
-      { name: `has${cap(p.name)}`, type: 'bool' },
-      { name: p.name, ...p.node.abiType },
-    ]),
+    components: model.picks.length
+      ? model.picks.flatMap((p) => [
+          { name: `has${cap(p.name)}`, type: 'bool' },
+          { name: p.name, ...p.node.abiType },
+        ])
+      : [{ name: PICKS_FILLER, type: 'bool' }],
   };
   const post = {
     type: 'tuple',
@@ -230,7 +240,9 @@ export function stepArrayAbi(model) {
     components: [{ name: 'action', type: 'uint8' }, picks, post],
   };
 
-  const picksCanon = `(${model.picks.flatMap((p) => ['bool', p.node.canonical]).join(',')})`;
+  const picksCanon = model.picks.length
+    ? `(${model.picks.flatMap((p) => ['bool', p.node.canonical]).join(',')})`
+    : '(bool)';
   const postCanon = `(${model.state.map((s) => s.node.canonical).join(',')})`;
   return { abi: step, canonical: `(uint8,${picksCanon},${postCanon})[]` };
 }
@@ -244,7 +256,14 @@ export function encodeTrace(model, trace, { file = '<trace>' } = {}) {
   const steps = trace.steps.map((step) => {
     const where = `${file} step ${step.index} (${step.action})`;
 
-    const picks = {};
+    if (typeof step.actionIndex !== 'number') {
+      throw new LowerError(
+        `${where}: step carries no actionIndex. \`indexActions\` maps trace action names onto the ` +
+          'configured enum and must run before `encodeTrace`',
+      );
+    }
+
+    const picks = model.picks.length ? {} : { [PICKS_FILLER]: false };
     for (const p of model.picks) {
       const got = step.picks[p.name];
       const present = Boolean(got && got.present);

@@ -23,6 +23,7 @@
   },
   "dependencies": {
     "@informalsystems/quint": "0.32.0",
+    "commander": "^15.0.0",
     "viem": "2.40.1"
   }
 }

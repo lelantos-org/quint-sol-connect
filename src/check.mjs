@@ -14,6 +14,7 @@ import path from 'node:path';
 import { TOOL_VERSION } from './gen.mjs';
 
 const cap = (s) => s.charAt(0).toUpperCase() + s.slice(1);
+const posix = (p) => p.split(path.sep).join('/');
 
 export function checkModel(model, root) {
   const problems = [];
@@ -96,9 +97,36 @@ export function checkModel(model, root) {
     }
   }
 
-  for (const f of [`${cap(model.name)}SpecReplay.sol`, `${cap(model.name)}Traces.t.sol`]) {
-    const abs = path.resolve(root, model.solidityOut, f);
-    if (!fs.existsSync(abs)) problems.push(`${path.relative(root, abs)} is missing`);
+  const replayFile = path.resolve(root, model.solidityOut, `${cap(model.name)}SpecReplay.sol`);
+  if (!fs.existsSync(replayFile)) problems.push(`${path.relative(root, replayFile)} is missing`);
+
+  // The generated tests name their fixtures as literal paths, and `vm.readFile`
+  // is the first thing a replay does. A fixture that was deleted or renamed by
+  // hand therefore fails inside `forge test`, one test at a time, with a file
+  // error rather than a drift error. Cheaper to say it here.
+  const tracesFile = path.resolve(root, model.solidityOut, `${cap(model.name)}Traces.t.sol`);
+  if (!fs.existsSync(tracesFile)) {
+    problems.push(`${path.relative(root, tracesFile)} is missing`);
+  } else {
+    const src = fs.readFileSync(tracesFile, 'utf8');
+    const replayed = [...src.matchAll(/_replay\("([^"]+)"\)/g)].map((m) => m[1]);
+    const relDir = posix(path.relative(root, fixtureDir));
+    const expected = fixtures.map((f) => `${relDir}/${f}`);
+
+    const missing = replayed.filter((p) => !fs.existsSync(path.resolve(root, p)));
+    if (missing.length) {
+      problems.push(
+        `${path.relative(root, tracesFile)} replays ${missing.length} fixture(s) that do not ` +
+          `exist: ${missing.join(', ')}`,
+      );
+    }
+    const orphaned = expected.filter((p) => !replayed.includes(p));
+    if (orphaned.length) {
+      problems.push(
+        `${orphaned.length} fixture(s) have no test in ${path.relative(root, tracesFile)}: ` +
+          `${orphaned.join(', ')}`,
+      );
+    }
   }
 
   return { problems, fixtures: fixtures.length };

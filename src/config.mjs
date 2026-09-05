@@ -7,6 +7,7 @@
  * to the Solidity it was generated for.
  */
 
+import fs from 'node:fs';
 import { pathToFileURL } from 'node:url';
 import path from 'node:path';
 import { keccak256, toHex } from 'viem';
@@ -32,25 +33,33 @@ export const DEFAULTS = {
   run: { traces: 16, maxSteps: 20, maxSamples: 20000, seed: '0x1', invariant: null },
 };
 
-/** Load `quint-connect.config.mjs` (or `.json`) from `root`. */
+/** Load `quint-sol-connect.config.mjs` (or `.json`) from `root`. */
 export async function loadConfig(root, file) {
   const candidates = file
     ? [file]
-    : ['quint-connect.config.mjs', 'quint-connect.config.js', 'quint-connect.config.json'];
+    : [
+        'quint-sol-connect.config.mjs',
+        'quint-sol-connect.config.js',
+        'quint-sol-connect.config.json',
+      ];
 
+  // Existence decides which candidate to load; whatever `import` then throws is
+  // the user's own config failing and is reported as-is. Catching
+  // ERR_MODULE_NOT_FOUND here instead would swallow a config whose *own*
+  // imports are broken - that error names the importer, so it looks identical
+  // to the file being absent - and report it as "no config found".
   for (const c of candidates) {
     const abs = path.resolve(root, c);
-    try {
-      const mod = await import(pathToFileURL(abs).href, {
-        with: abs.endsWith('.json') ? { type: 'json' } : undefined,
-      });
-      return { config: mod.default ?? mod, file: abs };
-    } catch (e) {
-      if (e?.code !== 'ERR_MODULE_NOT_FOUND' || !String(e.message).includes(abs)) throw e;
-    }
+    if (!fs.existsSync(abs)) continue;
+    const mod = await import(pathToFileURL(abs).href, {
+      with: abs.endsWith('.json') ? { type: 'json' } : undefined,
+    });
+    return { config: mod.default ?? mod, file: abs };
   }
+
+  if (file) throw new ConfigError(`config file "${file}" does not exist (looked in ${root})`);
   throw new ConfigError(
-    `no config found in ${root}. Create quint-connect.config.mjs with a \`specs\` map ` +
+    `no config found in ${root}. Create quint-sol-connect.config.mjs with a \`specs\` map ` +
       '(see the README, or run `quint-sol-connect scaffold`)',
   );
 }
@@ -143,7 +152,14 @@ export function buildModel(name, raw, config) {
   // Solidity asserts and the encoder that writes the blob cannot drift apart.
   const { canonical } = stepArrayAbi(model);
   model.canonical = canonical;
-  model.schemaHash = keccak256(toHex(canonical));
+
+  // The action names are hashed alongside the type string. They are not part of
+  // it - a step's action is a `uint8` however many actions there are - so
+  // renaming, reordering or dropping one leaves `canonical` byte-identical
+  // while repointing every recorded tag at a different action. Hashing only the
+  // type string let that change pass `check` and then replay each step as the
+  // wrong action, which surfaces as a state divergence in the wrong place.
+  model.schemaHash = keccak256(toHex(`${canonical}|${actions.map((a) => a.name).join(',')}`));
   return model;
 }
 

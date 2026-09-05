@@ -19,6 +19,12 @@ export const TOOL_VERSION = require_('../package.json').version;
 const cap = (s) => s.charAt(0).toUpperCase() + s.slice(1);
 const pad3 = (n) => String(n).padStart(3, '0');
 
+// Fixture paths are written into a Solidity string literal and into `meta.itf`,
+// both of which are read back by `vm.readFile`. `path.join` uses the host
+// separator, so on Windows those become backslashes - which Solidity reads as
+// escapes. Every path that leaves this process for a generated file is posix.
+const posix = (p) => p.split(path.sep).join('/');
+
 export class GenError extends Error {
   constructor(message) {
     super(message);
@@ -96,9 +102,9 @@ export function generateSpec(model, { root, quintBin, quintVer, fresh, outOverri
       mainModule: model.module,
     }));
 
-    const fixtureDir = outOverride
-      ? path.join(outOverride, model.name)
-      : path.join(model.fixtureOut, model.name);
+    const fixtureDir = posix(
+      outOverride ? path.join(outOverride, model.name) : path.join(model.fixtureOut, model.name),
+    );
     const absFixtureDir = path.resolve(root, fixtureDir);
     fs.rmSync(absFixtureDir, { recursive: true, force: true });
     fs.mkdirSync(absFixtureDir, { recursive: true });
@@ -139,14 +145,14 @@ export function generateSpec(model, { root, quintBin, quintVer, fresh, outOverri
         actions: model.actions.map((a) => a.name),
         schemaHash: model.schemaHash,
         testName,
-        itf: path.join(fixtureDir, itfName),
+        itf: `${fixtureDir}/${itfName}`,
       };
       fs.writeFileSync(
         path.join(absFixtureDir, jsonName),
         `${JSON.stringify({ meta, steps: blob }, null, 2)}\n`,
       );
 
-      fixtures.push({ testName, path: path.join(fixtureDir, jsonName), steps: trace.steps.length });
+      fixtures.push({ testName, path: `${fixtureDir}/${jsonName}`, steps: trace.steps.length });
     });
 
     const solDir = path.resolve(root, model.solidityOut);
@@ -167,10 +173,7 @@ export function generateSpec(model, { root, quintBin, quintVer, fresh, outOverri
           'tests know which hand-written driver to extend',
       );
     }
-    const driverImport = path
-      .relative(solDir, path.resolve(root, model.driver.path))
-      .split(path.sep)
-      .join('/');
+    const driverImport = posix(path.relative(solDir, path.resolve(root, model.driver.path)));
     const tracesFile = path.join(solDir, `${cap(model.name)}Traces.t.sol`);
     fs.writeFileSync(
       tracesFile,
