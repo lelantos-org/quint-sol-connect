@@ -58,6 +58,10 @@ program
   .argument('[specs...]', 'spec names from the config (default: all)')
   .option('--fresh', "use a random seed instead of the config's pinned one")
   .option('--out <dir>', 'write fixtures here instead of the configured path')
+  .option(
+    '--sol-out <dir>',
+    'write only the per-trace contract here, leaving the committed Solidity alone',
+  )
   .option('--traces <n>', 'override run.traces', positiveInt)
   .option('--steps <n>', 'override run.maxSteps', positiveInt)
   .option('--samples <n>', 'override run.maxSamples', positiveInt)
@@ -85,6 +89,7 @@ program
         quintVer,
         fresh: Boolean(opts.fresh),
         outOverride: opts.out,
+        solOutOverride: opts.solOut,
         runOverride,
         runtimeImport,
         cmd: `quint-sol-connect gen ${model.name}`,
@@ -98,7 +103,9 @@ program
       );
       console.log(`  fixtures -> ${summary.fixtureDir}`);
       console.log(
-        `  solidity -> ${model.solidityOut}${summary.fmt?.formatted ? ' (forge fmt applied)' : ''}`,
+        `  solidity -> ${path.relative(root, summary.solDir) || '.'}` +
+          `${summary.scratch ? ' (per-trace contract only)' : ''}` +
+          `${summary.fmt?.formatted ? ' (forge fmt applied)' : ''}`,
       );
       if (summary.fmt && !summary.fmt.formatted) {
         console.log(`  note: not formatted - ${summary.fmt.reason}`);

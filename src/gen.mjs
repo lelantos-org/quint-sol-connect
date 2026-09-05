@@ -81,7 +81,7 @@ export function stableItf(raw) {
 }
 
 /** Generate everything for one model. Returns a summary for reporting. */
-export function generateSpec(model, { root, quintBin, quintVer, fresh, outOverride, runOverride, runtimeImport, cmd, format }) {
+export function generateSpec(model, { root, quintBin, quintVer, fresh, outOverride, solOutOverride, runOverride, runtimeImport, cmd, format }) {
   const run = { ...model.run, ...(runOverride ?? {}) };
   if (fresh) run.seed = `0x${Buffer.from(crypto.getRandomValues(new Uint8Array(8))).toString('hex')}`;
 
@@ -155,17 +155,25 @@ export function generateSpec(model, { root, quintBin, quintVer, fresh, outOverri
       fixtures.push({ testName, path: `${fixtureDir}/${jsonName}`, steps: trace.steps.length });
     });
 
-    const solDir = path.resolve(root, model.solidityOut);
+    // A scratch run (`--fresh --out ... --sol-out ...`) must not touch the
+    // committed Solidity: the per-trace tests embed fixture paths, so rewriting
+    // them in place would leave the committed suite pointing at a temporary
+    // directory. A scratch run therefore emits *only* its own per-trace
+    // contract, under a distinct name, and imports the committed types.
+    const scratch = Boolean(solOutOverride);
+    const solDir = path.resolve(root, solOutOverride ?? model.solidityOut);
     fs.mkdirSync(solDir, { recursive: true });
     const written = [];
 
-    const libFile = path.join(solDir, `${model.lib}.sol`);
-    fs.writeFileSync(libFile, emitSpecLibrary(model, cmd));
-    written.push(libFile);
+    if (!scratch) {
+      const libFile = path.join(solDir, `${model.lib}.sol`);
+      fs.writeFileSync(libFile, emitSpecLibrary(model, cmd));
+      written.push(libFile);
 
-    const replayFile = path.join(solDir, `${cap(model.name)}SpecReplay.sol`);
-    fs.writeFileSync(replayFile, emitSpecReplay(model, cmd, { runtimeImport }));
-    written.push(replayFile);
+      const replayFile = path.join(solDir, `${cap(model.name)}SpecReplay.sol`);
+      fs.writeFileSync(replayFile, emitSpecReplay(model, cmd, { runtimeImport }));
+      written.push(replayFile);
+    }
 
     if (!model.driver?.path || !model.driver?.contract) {
       throw new GenError(
@@ -174,21 +182,22 @@ export function generateSpec(model, { root, quintBin, quintVer, fresh, outOverri
       );
     }
     const driverImport = posix(path.relative(solDir, path.resolve(root, model.driver.path)));
-    const tracesFile = path.join(solDir, `${cap(model.name)}Traces.t.sol`);
+    const contractName = `${cap(model.name)}${scratch ? 'Fresh' : ''}Traces`;
+    const tracesFile = path.join(solDir, `${contractName}.t.sol`);
     fs.writeFileSync(
       tracesFile,
       emitTraces(model, cmd, {
         fixtures,
         driverImport: driverImport.startsWith('.') ? driverImport : `./${driverImport}`,
         driverContract: model.driver.contract,
-        contractName: `${cap(model.name)}Traces`,
+        contractName,
       }),
     );
     written.push(tracesFile);
 
     const fmt = format === false ? { formatted: false, reason: 'disabled in config' } : formatSolidity(root, written);
 
-    return { model, fixtures, totals, seed: run.seed, fixtureDir, solDir, fmt };
+    return { model, fixtures, totals, seed: run.seed, fixtureDir, solDir, fmt, scratch };
   } finally {
     fs.rmSync(tmp, { recursive: true, force: true });
   }
