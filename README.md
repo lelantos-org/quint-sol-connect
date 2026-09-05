@@ -184,6 +184,29 @@ return the same order. Comparing unordered collections in an unspecified order i
 the classic way for a model-based harness to produce failures that are not real,
 so the order is fixed in one place and documented rather than left to chance.
 
+## Commands
+
+```
+quint-sol-connect gen [specs...]      regenerate fixtures and Solidity
+quint-sol-connect check [specs...]    verify committed output still matches the config
+quint-sol-connect scaffold <spec>     write a driver stub, once
+```
+
+`--help` on any of them. `gen` takes `--fresh`, `--seed`, `--traces`, `--steps`
+and `--samples` to override the config, plus two redirects:
+
+- `--out <dir>` writes the fixtures elsewhere.
+- `--sol-out <dir>` writes the per-trace contract elsewhere, and *only* that
+  contract, named `<Name>FreshTraces`. Use both together for a scratch run: the
+  committed per-trace contract embeds fixture paths, so redirecting only the
+  fixtures would leave the committed suite pointing at a temporary directory.
+
+`scaffold` writes the driver once and refuses to overwrite it, because the
+driver is the one file you own. Every branch of the stub reverts rather than
+returning a default — an unfilled branch has to fail loudly, since a stub that
+returned zeros would compare clean against a freshly deployed contract and look
+like a passing suite.
+
 ## Determinism
 
 `run.seed` is pinned in the config, so regenerating an unchanged spec is a
@@ -194,8 +217,18 @@ quint-sol-connect gen && git diff --exit-code
 ```
 
 `quint-sol-connect check` verifies committed fixtures still match the config
-without running quint at all — it re-derives the schema hash and compares. Use
-`gen --fresh` for a nightly sweep with real randomness.
+without running quint at all — it re-derives the schema hash and compares. The
+hash covers the action names as well as the type string, because reordering
+actions changes what each recorded `uint8` tag means while leaving the canonical
+type byte-identical.
+
+For a nightly sweep with real randomness, point a fresh run at scratch paths so
+it cannot disturb any of that:
+
+```bash
+quint-sol-connect gen --fresh --out .scratch/fixtures --sol-out .scratch/sol
+forge test --match-path ".scratch/sol/**"
+```
 
 ## Coverage
 
@@ -234,6 +267,23 @@ instead of decoding into nonsense.
 - `quint run` only — not `quint test` or `quint verify`.
 - Quint does not shrink, so a failing trace is as long as it was generated.
 - Replay needs `isolate = false`; the base contract checks and says so.
+- The spec's own `pure val` constants are not emitted, so a driver that needs one keeps its own copy. A disagreement shows up as a divergence rather than passing quietly, but it is a second copy.
+
+## In practice
+
+The [Lelantos contracts](https://github.com/lelantos-org/contracts) use this
+across three specs, which between them cover most of what the tool does:
+
+| Spec | Shape it exercises | What the model caught |
+| --- | --- | --- |
+| `commitment_tree` | a `List`, a `Set`, 90-step traces past a 64-entry ring wrap | refuted a plausible-looking invariant in 13 ms — a root can sit in the ring and still be marked unknown |
+| `nullifier_set` | a `Set` as the only variable, plus a negative action | — |
+| `masp` | a map to a record, an enum, a driver shadow with cross-checks | reproduced a latent bug in the existing invariant suite: a handler whose every call reverted, silently, under `fail_on_revert = false` |
+
+That last one is the case for the whole approach. An invariant run tells you a
+property held at the end of it. It cannot tell you the contract agreed with a
+model of itself at step 37, and it cannot tell the difference between a handler
+that did nothing and a handler that was never called.
 
 ## Development
 

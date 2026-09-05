@@ -19,11 +19,34 @@
   },
   "scripts": {
     "test": "node --test \"test/**/*.test.mjs\"",
-    "build": "npm test"
+    "build": "npm test",
+    "prepack": "npm test"
   },
   "dependencies": {
     "@informalsystems/quint": "0.32.0",
-    "commander": "^15.0.0",
+    "commander": "15.0.0",
     "viem": "2.40.1"
+  },
+  "keywords": [
+    "quint",
+    "solidity",
+    "foundry",
+    "forge",
+    "model-based-testing",
+    "formal-methods",
+    "tla",
+    "itf",
+    "ethereum"
+  ],
+  "homepage": "https://github.com/lelantos-org/quint-sol-connect#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/lelantos-org/quint-sol-connect.git"
+  },
+  "bugs": {
+    "url": "https://github.com/lelantos-org/quint-sol-connect/issues"
+  },
+  "publishConfig": {
+    "registry": "https://npm.pkg.github.com"
   }
 }

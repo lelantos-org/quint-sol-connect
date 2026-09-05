@@ -7,7 +7,20 @@
  * loudly instead of quietly comparing zeros.
  */
 
+import path from 'node:path';
+
 const cap = (s) => s.charAt(0).toUpperCase() + s.slice(1);
+
+/// Solidity resolves a relative import against the importing file, not against
+/// the project root, so the path has to be computed from the driver's own
+/// directory rather than copied out of the config.
+function importPrefix(model) {
+  const from = path.dirname(path.resolve('/', model.driver.path));
+  const to = path.resolve('/', model.solidityOut);
+  const rel = path.relative(from, to).split(path.sep).join('/');
+  if (rel === '') return '.';
+  return rel.startsWith('.') ? rel : `./${rel}`;
+}
 
 export function emitDriverStub(model, runtimeImport) {
   const q = model.qualify;
@@ -18,8 +31,9 @@ export function emitDriverStub(model, runtimeImport) {
   L.push('// SPDX-License-Identifier: Apache-2.0');
   L.push(`pragma solidity ${model.pragma};`);
   L.push('');
-  L.push(`import { ${model.lib} } from "${model.solidityOut}/${model.lib}.sol";`);
-  L.push(`import { ${replay} } from "${model.solidityOut}/${replay}.sol";`);
+  const from = importPrefix(model);
+  L.push(`import { ${model.lib} } from "${from}/${model.lib}.sol";`);
+  L.push(`import { ${replay} } from "${from}/${replay}.sol";`);
   L.push('');
   L.push(`/// Driver for ${model.specPath}.`);
   L.push('///');
