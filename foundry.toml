@@ -1,0 +1,29 @@
+[profile.default]
+src = "examples/counter/src"
+test = "examples/counter/test"
+script = "examples/counter/src"
+out = "out"
+libs = ["lib"]
+
+remappings = [
+    "forge-std/=lib/forge-std/src/",
+    # How a consumer using the npm package would write it:
+    #   "quint-connect-sol/=node_modules/@lelantos-org/quint-connect-sol/solidity/"
+    # How a consumer using the git submodule would write it:
+    #   "quint-connect-sol/=lib/quint-connect-sol/solidity/"
+    "quint-connect-sol/=solidity/",
+]
+
+fs_permissions = [{ access = "read", path = "examples/counter/fixtures" }]
+
+# Replay dispatches through an external self-call so a revert can be caught and
+# reported as an enabledness divergence. Under `isolate = true` each such call
+# would run in a fresh EVM context and no state would carry between steps.
+# QuintReplayBase probes for this and fails with that message rather than
+# leaving you to work it out from a step-1 mismatch.
+isolate = false
+
+[fmt]
+line_length = 120
+tab_width = 4
+bracket_spacing = true

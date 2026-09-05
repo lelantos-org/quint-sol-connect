@@ -1,0 +1,28 @@
+{
+  "name": "@lelantos-org/quint-connect-sol",
+  "version": "0.1.0",
+  "description": "Model-based testing for Solidity: replay Quint traces inside Foundry.",
+  "license": "Apache-2.0",
+  "type": "module",
+  "bin": {
+    "quint-connect-sol": "./bin/quint-connect-sol.mjs"
+  },
+  "files": [
+    "bin",
+    "src",
+    "solidity",
+    "README.md",
+    "LICENSE"
+  ],
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "test": "node --test \"test/**/*.test.mjs\"",
+    "build": "npm test"
+  },
+  "dependencies": {
+    "@informalsystems/quint": "0.32.0",
+    "viem": "2.40.1"
+  }
+}

@@ -1,0 +1,29 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  ci:
+    name: Unit, drift and example replay
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+          # `just gen-is-noop` diffs the working tree, so it needs real history.
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+          cache: npm
+
+      - uses: foundry-rs/foundry-toolchain@v1
+
+      - uses: extractions/setup-just@v2
+
+      - run: just install
+      - run: just ci
