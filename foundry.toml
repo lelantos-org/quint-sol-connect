@@ -8,10 +8,10 @@ libs = ["lib"]
 remappings = [
     "forge-std/=lib/forge-std/src/",
     # How a consumer using the npm package would write it:
-    #   "quint-connect-sol/=node_modules/@lelantos-org/quint-connect-sol/solidity/"
+    #   "quint-sol-connect/=node_modules/@lelantos-org/quint-sol-connect/solidity/"
     # How a consumer using the git submodule would write it:
-    #   "quint-connect-sol/=lib/quint-connect-sol/solidity/"
-    "quint-connect-sol/=solidity/",
+    #   "quint-sol-connect/=lib/quint-sol-connect/solidity/"
+    "quint-sol-connect/=solidity/",
 ]
 
 fs_permissions = [{ access = "read", path = "examples/counter/fixtures" }]

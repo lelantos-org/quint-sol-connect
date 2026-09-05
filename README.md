@@ -1,4 +1,4 @@
-# quint-connect-sol
+# quint-sol-connect
 
 Model-based testing for Solidity. Write a [Quint](https://quint-lang.org) spec of
 what your contract is supposed to do, let Quint's simulator generate traces, and
@@ -30,7 +30,7 @@ The only thing that needs the JS toolchain is regenerating.
 ## Install
 
 ```bash
-npm install --save-dev @lelantos-org/quint-connect-sol
+npm install --save-dev @lelantos-org/quint-sol-connect
 ```
 
 Quint ships as a dependency, so there is nothing else to install.
@@ -38,18 +38,18 @@ Quint ships as a dependency, so there is nothing else to install.
 Then add the Solidity to your remappings — via npm:
 
 ```toml
-remappings = ["quint-connect-sol/=node_modules/@lelantos-org/quint-connect-sol/solidity/"]
+remappings = ["quint-sol-connect/=node_modules/@lelantos-org/quint-sol-connect/solidity/"]
 ```
 
 or, if you would rather pin a commit and keep `forge test` free of npm entirely,
 as a git submodule under `lib/`:
 
 ```bash
-git submodule add https://github.com/lelantos-org/quint-connect-sol lib/quint-connect-sol
+git submodule add https://github.com/lelantos-org/quint-sol-connect lib/quint-sol-connect
 ```
 
 ```toml
-remappings = ["quint-connect-sol/=lib/quint-connect-sol/solidity/"]
+remappings = ["quint-sol-connect/=lib/quint-sol-connect/solidity/"]
 ```
 
 ## The five minute version
@@ -106,7 +106,7 @@ export default {
 };
 ```
 
-**3. Write the driver.** This is the only file you own. `quint-connect-sol
+**3. Write the driver.** This is the only file you own. `quint-sol-connect
 scaffold counter` writes a stub once and never touches it again.
 
 ```solidity
@@ -137,7 +137,7 @@ abstract contract CounterReplay is CounterSpecReplay {
 **4. Generate and run.**
 
 ```bash
-npx quint-connect-sol gen
+npx quint-sol-connect gen
 forge test
 ```
 
@@ -190,10 +190,10 @@ so the order is fixed in one place and documented rather than left to chance.
 byte-identical no-op. That is what lets you commit the fixtures and gate CI on:
 
 ```bash
-quint-connect-sol gen && git diff --exit-code
+quint-sol-connect gen && git diff --exit-code
 ```
 
-`quint-connect-sol check` verifies committed fixtures still match the config
+`quint-sol-connect check` verifies committed fixtures still match the config
 without running quint at all — it re-derives the schema hash and compares. Use
 `gen --fresh` for a nightly sweep with real randomness.
 

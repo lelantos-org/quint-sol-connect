@@ -4,7 +4,7 @@
     "format-description": "https://apalache-mc.org/docs/adr/015adr-trace.html",
     "source": "examples/counter/spec/counter.qnt",
     "status": "ok",
-    "description": "Created by Quint; regenerate with `quint-connect-sol gen`"
+    "description": "Created by Quint; regenerate with `quint-sol-connect gen`"
   },
   "vars": [
     "count",

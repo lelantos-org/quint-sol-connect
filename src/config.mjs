@@ -51,7 +51,7 @@ export async function loadConfig(root, file) {
   }
   throw new ConfigError(
     `no config found in ${root}. Create quint-connect.config.mjs with a \`specs\` map ` +
-      '(see the README, or run `quint-connect-sol scaffold`)',
+      '(see the README, or run `quint-sol-connect scaffold`)',
   );
 }
 

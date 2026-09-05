@@ -20,11 +20,11 @@ spec:
 
 [doc('Regenerate fixtures and Solidity for the example')]
 gen *args:
-    node bin/quint-connect-sol.mjs gen {{ args }}
+    node bin/quint-sol-connect.mjs gen {{ args }}
 
 [doc('Fail if committed fixtures drifted from the config')]
 check:
-    node bin/quint-connect-sol.mjs check
+    node bin/quint-sol-connect.mjs check
 
 # Regeneration must be byte-identical for an unchanged spec: that is what lets a
 # consumer gate CI on `gen && git diff --exit-code`. If this fails, something in

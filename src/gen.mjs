@@ -69,7 +69,7 @@ export function indexActions(model, trace, file) {
 export function stableItf(raw) {
   const meta = { ...(raw['#meta'] ?? {}) };
   delete meta.timestamp;
-  meta.description = 'Created by Quint; regenerate with `quint-connect-sol gen`';
+  meta.description = 'Created by Quint; regenerate with `quint-sol-connect gen`';
   return { ...raw, '#meta': meta };
 }
 

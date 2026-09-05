@@ -3,7 +3,7 @@ pragma solidity ^0.8.20;
 
 import { Vm } from "forge-std/Vm.sol";
 
-/// Loading for the fixtures `quint-connect-sol gen` writes.
+/// Loading for the fixtures `quint-sol-connect gen` writes.
 ///
 /// A fixture is `{"meta": {...}, "steps": "0x..."}`. The steps are ABI-encoded
 /// offline rather than left as JSON, so the only JSON paths in the whole system
@@ -53,9 +53,9 @@ library QuintTrace {
         require(
             meta.schemaHash == expectedSchemaHash,
             string.concat(
-                "quint-connect-sol: trace schema drift in ",
+                "quint-sol-connect: trace schema drift in ",
                 path,
-                " - the fixture was generated for a different state/action shape. Run `quint-connect-sol gen`."
+                " - the fixture was generated for a different state/action shape. Run `quint-sol-connect gen`."
             )
         );
 

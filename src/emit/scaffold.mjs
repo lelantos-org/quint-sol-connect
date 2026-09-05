@@ -23,7 +23,7 @@ export function emitDriverStub(model, runtimeImport) {
   L.push('');
   L.push(`/// Driver for ${model.specPath}.`);
   L.push('///');
-  L.push('/// Generated once by \`quint-connect-sol scaffold\`; owned by you from here on.');
+  L.push('/// Generated once by \`quint-sol-connect scaffold\`; owned by you from here on.');
   L.push('/// `abstract` so Foundry does not collect it as a test contract - the generated');
   L.push(`/// \`${cap(model.name)}Traces\` inherits it and holds the per-trace tests.`);
   L.push(`abstract contract ${C} is ${replay} {`);

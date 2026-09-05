@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * quint-connect-sol CLI.
+ * quint-sol-connect CLI.
  *
  *   gen    [specs...]  generate trace fixtures and Solidity
  *   check  [specs...]  fail if committed output drifted from the config
@@ -15,9 +15,9 @@ import { generateSpec, coverageReport, resolveQuint, quintVersion, TOOL_VERSION 
 import { checkModel } from '../src/check.mjs';
 import { emitDriverStub } from '../src/emit/scaffold.mjs';
 
-const USAGE = `quint-connect-sol ${TOOL_VERSION}
+const USAGE = `quint-sol-connect ${TOOL_VERSION}
 
-  quint-connect-sol gen [specs...] [options]
+  quint-sol-connect gen [specs...] [options]
       Regenerate trace fixtures and generated Solidity.
       --fresh          random seed instead of the config's pinned one
       --out DIR        write fixtures here instead of the configured path
@@ -26,17 +26,17 @@ const USAGE = `quint-connect-sol ${TOOL_VERSION}
       --samples N      override run.maxSamples
       --seed X         override run.seed
 
-  quint-connect-sol check [specs...]
+  quint-sol-connect check [specs...]
       Verify committed fixtures and Solidity still match the config. No quint.
 
-  quint-connect-sol scaffold <spec>
+  quint-sol-connect scaffold <spec>
       Write a driver stub for a spec. Never overwrites an existing file.
 
   Common options:
       --config FILE    config path (default: quint-connect.config.mjs)
       --root DIR       project root (default: cwd)
       --runtime PATH   Solidity import prefix for the package's own contracts
-                       (default: quint-connect-sol)
+                       (default: quint-sol-connect)
 `;
 
 function parseArgs(argv) {
@@ -55,7 +55,7 @@ function parseArgs(argv) {
 }
 
 const die = (msg) => {
-  console.error(`quint-connect-sol: ${msg}`);
+  console.error(`quint-sol-connect: ${msg}`);
   process.exit(1);
 };
 
@@ -68,7 +68,7 @@ async function main() {
 
   const { _: names, flags } = parseArgs(rest);
   const root = path.resolve(flags.root ?? process.cwd());
-  const runtimeImport = flags.runtime ?? 'quint-connect-sol';
+  const runtimeImport = flags.runtime ?? 'quint-sol-connect';
 
   const { config, file } = await loadConfig(root, flags.config);
 
@@ -85,7 +85,7 @@ async function main() {
 
     let dead = false;
     for (const model of models) {
-      const cmd = `quint-connect-sol gen ${model.name}`;
+      const cmd = `quint-sol-connect gen ${model.name}`;
       const summary = generateSpec(model, {
         root,
         quintBin,
@@ -134,7 +134,7 @@ async function main() {
       }
     }
     if (failed) {
-      console.error('\nRegenerate with `quint-connect-sol gen`.');
+      console.error('\nRegenerate with `quint-sol-connect gen`.');
       process.exit(1);
     }
     return;
@@ -152,7 +152,7 @@ async function main() {
     fs.mkdirSync(path.dirname(target), { recursive: true });
     fs.writeFileSync(target, emitDriverStub(model, runtimeImport));
     console.log(`wrote ${model.driver.path}`);
-    console.log('Fill in setUp, apply_ and _project, then run `quint-connect-sol gen`.');
+    console.log('Fill in setUp, apply_ and _project, then run `quint-sol-connect gen`.');
     return;
   }
 

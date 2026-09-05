@@ -164,16 +164,16 @@ abstract contract QuintReplayBase is Test {
         _isolateChecked = true;
         uint256 sentinel = _isolateProbe + 1;
         (bool ok,) = address(this).call(abi.encodeCall(this.quintIsolateProbe, (sentinel)));
-        require(ok, "quint-connect-sol: isolate probe call failed");
+        require(ok, "quint-sol-connect: isolate probe call failed");
         require(
             _isolateProbe == sentinel,
-            "quint-connect-sol: replay requires `isolate = false` in foundry.toml - "
+            "quint-sol-connect: replay requires `isolate = false` in foundry.toml - "
             "with isolation on, each step runs in a fresh EVM context and no state carries between them"
         );
     }
 
     function quintIsolateProbe(uint256 v) external {
-        require(msg.sender == address(this), "quint-connect-sol: self-call only");
+        require(msg.sender == address(this), "quint-sol-connect: self-call only");
         _isolateProbe = v;
     }
 }
