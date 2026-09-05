@@ -95,6 +95,7 @@ async function main() {
         runOverride,
         runtimeImport,
         cmd,
+        format: config.format,
       });
 
       const steps = summary.fixtures.reduce((n, f) => n + f.steps, 0);
@@ -103,7 +104,12 @@ async function main() {
           `(quint ${quintVer})`,
       );
       console.log(`  fixtures -> ${summary.fixtureDir}`);
-      console.log(`  solidity -> ${model.solidityOut}`);
+      console.log(
+        `  solidity -> ${model.solidityOut}${summary.fmt?.formatted ? ' (forge fmt applied)' : ''}`,
+      );
+      if (summary.fmt && !summary.fmt.formatted) {
+        console.log(`  note: not formatted - ${summary.fmt.reason}`);
+      }
       const { lines, dead: never } = coverageReport(summary);
       for (const l of lines) console.log(l);
       if (never.length) {

@@ -11,6 +11,7 @@ import { decodeTrace } from './itf.mjs';
 import { encodeTrace } from './lower.mjs';
 import { emitSpecLibrary, emitSpecReplay, emitTraces } from './emit/solidity.mjs';
 import { generateTraces, resolveQuint, quintVersion, typecheck } from './quint.mjs';
+import { formatSolidity } from './format.mjs';
 
 const require_ = createRequire(import.meta.url);
 export const TOOL_VERSION = require_('../package.json').version;
@@ -74,7 +75,7 @@ export function stableItf(raw) {
 }
 
 /** Generate everything for one model. Returns a summary for reporting. */
-export function generateSpec(model, { root, quintBin, quintVer, fresh, outOverride, runOverride, runtimeImport, cmd }) {
+export function generateSpec(model, { root, quintBin, quintVer, fresh, outOverride, runOverride, runtimeImport, cmd, format }) {
   const run = { ...model.run, ...(runOverride ?? {}) };
   if (fresh) run.seed = `0x${Buffer.from(crypto.getRandomValues(new Uint8Array(8))).toString('hex')}`;
 
@@ -150,12 +151,15 @@ export function generateSpec(model, { root, quintBin, quintVer, fresh, outOverri
 
     const solDir = path.resolve(root, model.solidityOut);
     fs.mkdirSync(solDir, { recursive: true });
+    const written = [];
 
-    fs.writeFileSync(path.join(solDir, `${model.lib}.sol`), emitSpecLibrary(model, cmd));
-    fs.writeFileSync(
-      path.join(solDir, `${cap(model.name)}SpecReplay.sol`),
-      emitSpecReplay(model, cmd, { runtimeImport }),
-    );
+    const libFile = path.join(solDir, `${model.lib}.sol`);
+    fs.writeFileSync(libFile, emitSpecLibrary(model, cmd));
+    written.push(libFile);
+
+    const replayFile = path.join(solDir, `${cap(model.name)}SpecReplay.sol`);
+    fs.writeFileSync(replayFile, emitSpecReplay(model, cmd, { runtimeImport }));
+    written.push(replayFile);
 
     if (!model.driver?.path || !model.driver?.contract) {
       throw new GenError(
@@ -167,8 +171,9 @@ export function generateSpec(model, { root, quintBin, quintVer, fresh, outOverri
       .relative(solDir, path.resolve(root, model.driver.path))
       .split(path.sep)
       .join('/');
+    const tracesFile = path.join(solDir, `${cap(model.name)}Traces.t.sol`);
     fs.writeFileSync(
-      path.join(solDir, `${cap(model.name)}Traces.t.sol`),
+      tracesFile,
       emitTraces(model, cmd, {
         fixtures,
         driverImport: driverImport.startsWith('.') ? driverImport : `./${driverImport}`,
@@ -176,8 +181,11 @@ export function generateSpec(model, { root, quintBin, quintVer, fresh, outOverri
         contractName: `${cap(model.name)}Traces`,
       }),
     );
+    written.push(tracesFile);
 
-    return { model, fixtures, totals, seed: run.seed, fixtureDir, solDir };
+    const fmt = format === false ? { formatted: false, reason: 'disabled in config' } : formatSolidity(root, written);
+
+    return { model, fixtures, totals, seed: run.seed, fixtureDir, solDir, fmt };
   } finally {
     fs.rmSync(tmp, { recursive: true, force: true });
   }

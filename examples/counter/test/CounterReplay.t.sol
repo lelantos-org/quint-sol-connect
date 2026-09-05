@@ -52,9 +52,7 @@ abstract contract CounterReplay is CounterSpecReplay {
         s.entries = new CounterSpec.EntriesEntry[](keys.length);
         for (uint256 i = 0; i < keys.length; i++) {
             s.entries[i] = CounterSpec.EntriesEntry({
-                key: keys[i],
-                hits: counter.hits(keys[i]),
-                flagged: counter.flagged(keys[i])
+                key: keys[i], hits: counter.hits(keys[i]), flagged: counter.flagged(keys[i])
             });
         }
     }

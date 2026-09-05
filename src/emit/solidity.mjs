@@ -348,9 +348,15 @@ export function emitTraces(model, cmd, { fixtures, driverImport, driverContract,
   L.push('/// each trace replays from a fresh deployment, and a failure names the one');
   L.push('/// trace to rerun rather than the whole suite.');
   L.push(`contract ${contractName} is ${driverContract} {`);
-  for (const f of fixtures) {
-    L.push(`    function ${f.testName}() public { _replay("${f.path}"); }`);
-  }
+  // Multi-line bodies, and a blank line between them: `forge fmt` rewrites the
+  // one-line form, and generated output that fails a consumer's format check is
+  // a papercut for every consumer.
+  fixtures.forEach((f, i) => {
+    if (i > 0) L.push('');
+    L.push(`    function ${f.testName}() public {`);
+    L.push(`        _replay("${f.path}");`);
+    L.push('    }');
+  });
   L.push('}');
   return L.join('\n') + '\n';
 }

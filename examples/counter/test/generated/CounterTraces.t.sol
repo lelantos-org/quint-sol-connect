@@ -12,16 +12,51 @@ import { CounterReplay } from "../CounterReplay.t.sol";
 /// each trace replays from a fresh deployment, and a failure names the one
 /// trace to rerun rather than the whole suite.
 contract CounterTraces is CounterReplay {
-    function test_quint_counter_000() public { _replay("examples/counter/fixtures/counter/trace-000.json"); }
-    function test_quint_counter_001() public { _replay("examples/counter/fixtures/counter/trace-001.json"); }
-    function test_quint_counter_002() public { _replay("examples/counter/fixtures/counter/trace-002.json"); }
-    function test_quint_counter_003() public { _replay("examples/counter/fixtures/counter/trace-003.json"); }
-    function test_quint_counter_004() public { _replay("examples/counter/fixtures/counter/trace-004.json"); }
-    function test_quint_counter_005() public { _replay("examples/counter/fixtures/counter/trace-005.json"); }
-    function test_quint_counter_006() public { _replay("examples/counter/fixtures/counter/trace-006.json"); }
-    function test_quint_counter_007() public { _replay("examples/counter/fixtures/counter/trace-007.json"); }
-    function test_quint_counter_008() public { _replay("examples/counter/fixtures/counter/trace-008.json"); }
-    function test_quint_counter_009() public { _replay("examples/counter/fixtures/counter/trace-009.json"); }
-    function test_quint_counter_010() public { _replay("examples/counter/fixtures/counter/trace-010.json"); }
-    function test_quint_counter_011() public { _replay("examples/counter/fixtures/counter/trace-011.json"); }
+    function test_quint_counter_000() public {
+        _replay("examples/counter/fixtures/counter/trace-000.json");
+    }
+
+    function test_quint_counter_001() public {
+        _replay("examples/counter/fixtures/counter/trace-001.json");
+    }
+
+    function test_quint_counter_002() public {
+        _replay("examples/counter/fixtures/counter/trace-002.json");
+    }
+
+    function test_quint_counter_003() public {
+        _replay("examples/counter/fixtures/counter/trace-003.json");
+    }
+
+    function test_quint_counter_004() public {
+        _replay("examples/counter/fixtures/counter/trace-004.json");
+    }
+
+    function test_quint_counter_005() public {
+        _replay("examples/counter/fixtures/counter/trace-005.json");
+    }
+
+    function test_quint_counter_006() public {
+        _replay("examples/counter/fixtures/counter/trace-006.json");
+    }
+
+    function test_quint_counter_007() public {
+        _replay("examples/counter/fixtures/counter/trace-007.json");
+    }
+
+    function test_quint_counter_008() public {
+        _replay("examples/counter/fixtures/counter/trace-008.json");
+    }
+
+    function test_quint_counter_009() public {
+        _replay("examples/counter/fixtures/counter/trace-009.json");
+    }
+
+    function test_quint_counter_010() public {
+        _replay("examples/counter/fixtures/counter/trace-010.json");
+    }
+
+    function test_quint_counter_011() public {
+        _replay("examples/counter/fixtures/counter/trace-011.json");
+    }
 }

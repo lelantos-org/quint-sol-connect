@@ -30,8 +30,7 @@ abstract contract CounterSpecReplay is QuintReplayBase {
     // --- the replay loop --------------------------------------------------
 
     function _replay(string memory path) internal {
-        (QuintTrace.Meta memory meta, bytes memory blob) =
-            QuintTrace.load(path, CounterSpec.SCHEMA_HASH);
+        (QuintTrace.Meta memory meta, bytes memory blob) = QuintTrace.load(path, CounterSpec.SCHEMA_HASH);
         _beginTrace(path, meta);
 
         CounterSpec.Step[] memory steps = abi.decode(blob, (CounterSpec.Step[]));
@@ -70,11 +69,9 @@ abstract contract CounterSpecReplay is QuintReplayBase {
 
     /// Compare every state variable, accumulating rather than short-circuiting,
     /// so one step reports every field that moved.
-    function _assertState(
-        CounterSpec.State memory model_,
-        CounterSpec.State memory chain,
-        string memory action
-    ) private {
+    function _assertState(CounterSpec.State memory model_, CounterSpec.State memory chain, string memory action)
+        private
+    {
         _mismatches += _eqU("count", model_.count, chain.count);
         _mismatches += _eqStr("status", CounterSpec.statusName(model_.status), CounterSpec.statusName(chain.status));
         _mismatches += _cmpArrUint256("seen", model_.seen, chain.seen);
@@ -82,11 +79,7 @@ abstract contract CounterSpecReplay is QuintReplayBase {
         _reportIfDiverged(action);
     }
 
-    function _cmpArrUint256(
-        string memory f,
-        uint256[] memory m,
-        uint256[] memory c
-    ) private returns (uint256 n) {
+    function _cmpArrUint256(string memory f, uint256[] memory m, uint256[] memory c) private returns (uint256 n) {
         n += _eqU(string.concat(f, ".length"), m.length, c.length);
         // Lengths differing makes element-wise output noise, not signal.
         if (m.length != c.length) return n;
@@ -108,11 +101,10 @@ abstract contract CounterSpecReplay is QuintReplayBase {
         }
     }
 
-    function _cmpEntriesEntry(
-        string memory f,
-        CounterSpec.EntriesEntry memory m,
-        CounterSpec.EntriesEntry memory c
-    ) private returns (uint256 n) {
+    function _cmpEntriesEntry(string memory f, CounterSpec.EntriesEntry memory m, CounterSpec.EntriesEntry memory c)
+        private
+        returns (uint256 n)
+    {
         n += _eqU(string.concat(f, ".key"), m.key, c.key);
         n += _eqU(string.concat(f, ".hits"), m.hits, c.hits);
         n += _eqB(string.concat(f, ".flagged"), m.flagged, c.flagged);

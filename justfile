@@ -8,7 +8,7 @@ install:
     npm ci
 
 [doc('Everything CI runs')]
-ci: unit check gen-is-noop example generic
+ci: unit check gen-is-noop example generic fmt-check
 
 [doc('Unit tests for the ITF decoder and the ABI lowering')]
 unit:

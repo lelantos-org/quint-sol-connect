@@ -11,12 +11,21 @@ library CounterSpec {
     bytes32 internal constant SCHEMA_HASH = 0x90ae0031a69509ab256085674d96c954936bb0d03d883fd4e83ad784ddf2d3b0;
 
     /// (uint8,(bool,uint256,bool,uint256),(uint256,uint8,uint256[],(uint256,uint256,bool)[]))[]
-    string internal constant CANONICAL_TYPE = "(uint8,(bool,uint256,bool,uint256),(uint256,uint8,uint256[],(uint256,uint256,bool)[]))[]";
+    string internal constant CANONICAL_TYPE =
+        "(uint8,(bool,uint256,bool,uint256),(uint256,uint8,uint256[],(uint256,uint256,bool)[]))[]";
 
     /// Order pins the enum values; it comes from the config's `actions` map.
-    enum Action { Increment, Touch, Finish }
+    enum Action {
+        Increment,
+        Touch,
+        Finish
+    }
 
-    enum Status { Idle, Running, Done }
+    enum Status {
+        Idle,
+        Running,
+        Done
+    }
 
     struct EntriesEntry {
         uint256 key;
