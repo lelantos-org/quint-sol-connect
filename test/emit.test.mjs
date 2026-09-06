@@ -82,6 +82,33 @@ test('encodeTrace refuses a trace that indexActions has not run over', () => {
   assert.throws(() => encodeTrace(NO_PICKS, trace), (e) => e instanceof LowerError && /indexActions/.test(e.message));
 });
 
+// A variable the spec declares and the config forgets used to be dropped in
+// silence - out of `State`, out of the comparison, and out of the schema hash,
+// so the replay stayed green while asserting nothing about it. Ghosts are the
+// usual way this happens, since a ghost is added to the spec alone.
+test('encodeTrace refuses a trace carrying a variable the config never mentions', () => {
+  const trace = {
+    steps: [{ index: 0, actionIndex: 0, picks: {}, state: { ...stateFor(NO_PICKS), ghostSeen: 0n } }],
+  };
+  assert.throws(
+    () => encodeTrace(NO_PICKS, trace),
+    (e) => e instanceof LowerError && /ghostSeen/.test(e.message) && /ignoreState/.test(e.message),
+  );
+});
+
+test('a variable named under ignoreState is accepted and left out of the comparison', () => {
+  const m = model({
+    state: { count: 'uint256' },
+    ignoreState: { ghostSeen: 'ghost: counts steps, so a run that did nothing is visible' },
+    actions: { increment: {}, finish: {} },
+  });
+  const trace = {
+    steps: [{ index: 0, actionIndex: 0, picks: {}, state: { ...stateFor(m), ghostSeen: 7n } }],
+  };
+  const [steps] = decodeAbiParameters([stepArrayAbi(m).abi], encodeTrace(m, trace));
+  assert.deepEqual(Object.keys(steps[0].post), ['count']);
+});
+
 // --- library ---------------------------------------------------------------
 
 test('the library commits to the model schema hash', () => {

@@ -253,6 +253,8 @@ const cap = (s) => s.charAt(0).toUpperCase() + s.slice(1);
 export function encodeTrace(model, trace, { file = '<trace>' } = {}) {
   const { abi } = stepArrayAbi(model);
 
+  assertEveryVarAccountedFor(model, trace, file);
+
   const steps = trace.steps.map((step) => {
     const where = `${file} step ${step.index} (${step.action})`;
 
@@ -285,6 +287,40 @@ export function encodeTrace(model, trace, { file = '<trace>' } = {}) {
   });
 
   return encodeAbiParameters([abi], [steps]);
+}
+
+/**
+ * Every variable the trace carries must be either compared or deliberately not
+ * compared.
+ *
+ * The loop below only checks the other direction - that each configured
+ * variable is present in the trace. A variable the *spec* declares and the
+ * config never mentions was silently dropped: it vanished from `State`, from
+ * the comparison, and from the schema hash, so the replay stayed green while
+ * asserting nothing about it. That is the failure mode a ghost introduces, and
+ * a ghost is exactly the kind of variable someone adds without touching the
+ * config.
+ *
+ * So an omission is an error, and `ignoreState` is how it is resolved - which
+ * costs a written reason, because `ignoreState` reasons are validated.
+ */
+function assertEveryVarAccountedFor(model, trace, file) {
+  const first = trace.steps[0];
+  if (!first) return;
+
+  const known = new Set(model.state.map((s) => s.name));
+  const missing = Object.keys(first.state)
+    .filter((name) => !known.has(name) && !(name in model.ignoreState))
+    .sort();
+  if (missing.length === 0) return;
+
+  throw new LowerError(
+    `${file}: the spec declares ${missing.length === 1 ? 'a variable' : 'variables'} the config ` +
+      `never mentions: ${missing.join(', ')}. ` +
+      'List each one under `state` to compare it against the chain, or under `ignoreState` with ' +
+      'a reason if it is a ghost. Left out, it is silently dropped from the comparison and from ' +
+      'the schema hash, and the replay passes without asserting anything about it',
+  );
 }
 
 /**
