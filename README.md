@@ -207,6 +207,48 @@ returning a default — an unfilled branch has to fail loudly, since a stub that
 returned zeros would compare clean against a freshly deployed contract and look
 like a passing suite.
 
+## Bytes
+
+Fixtures are the binding constraint on how many specs a repo can carry: a trace
+set costs `traces × steps × state`, and the whole state is compared on every
+step. Runtime is not the constraint — three specs replay in ~65 ms.
+
+So `check` enforces a per-spec byte cap, warning at 80% and failing at 100%, and
+names the lever rather than just the number:
+
+```
+  ~2638 B/step encoded, largest contributors:
+    rootRing: 2112 B (80%)
+    knownRoots: 224 B (8%)
+    2 nondet pick name(s): 128 B (5%) - paid on every step whichever action ran
+```
+
+That last line is the non-obvious one: a pick's slot is present on every step
+whatever action ran, so the *number of pick names* is a budget line item, and
+consolidating several setter parameters behind one index into a `pure val` table
+is usually the cheapest cut available.
+
+A spec may take more than the default share, but not silently — an allocation
+above the default needs a `why`, which is printed in the allocation table so the
+trade is visible against the other specs:
+
+```js
+budget: { totalBytes: 12_000_000, defaultMaxBytes: 512_000 },
+// per spec, only where it exceeds the default:
+masp: { budget: { maxBytes: 5_500_000, why: '20 x 96 is what restored cancel coverage' } },
+```
+
+**Only one ITF companion is committed per spec**, as `exemplar.itf.json` — the
+trace that exercised every action the most evenly. The rest are derivable from
+committed inputs (pinned seed, pinned run parameters, with `quint-diff` proving
+determinism), and a file derivable from committed inputs does not belong in git.
+It roughly halves the cost of a spec. `.gitignore` needs two static lines:
+
+```
+fixtures/*/*.itf.json
+!fixtures/*/exemplar.itf.json
+```
+
 ## Determinism
 
 `run.seed` is pinned in the config, so regenerating an unchanged spec is a

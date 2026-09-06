@@ -25,6 +25,11 @@ export class ConfigError extends Error {
 const pascal = (s) => s.replace(/(^|[_-])(\w)/g, (_, __, c) => c.toUpperCase());
 const cap = (s) => s.charAt(0).toUpperCase() + s.slice(1);
 
+/** Bytes a spec may commit before `check` complains, absent a named allocation. */
+export const DEFAULT_MAX_BYTES = 512_000;
+/** Ceiling on the sum of every spec's allocation. */
+export const DEFAULT_TOTAL_BYTES = 12_000_000;
+
 export const DEFAULTS = {
   solidityOut: 'test/quint/generated',
   fixtureOut: 'test/fixtures/quint',
@@ -129,9 +134,30 @@ export function buildModel(name, raw, config) {
     requiredBy: pickOwners.get(pickName),
   }));
 
+  // A spec may take more than the default share of the byte budget, but not
+  // silently: an allocation above the default carries a reason, validated the
+  // way `ignoreState` reasons are. The failure this prevents is a cap quietly
+  // raised to whatever the current output happens to be, which is the same as
+  // having no cap.
+  const defaultMax = config.budget?.defaultMaxBytes ?? DEFAULT_MAX_BYTES;
+  if (raw.budget) {
+    const { maxBytes, why } = raw.budget;
+    if (!Number.isInteger(maxBytes) || maxBytes <= 0) {
+      throw new ConfigError(`spec "${name}": budget.maxBytes must be a positive integer`);
+    }
+    if (maxBytes > defaultMax && (typeof why !== 'string' || why.trim() === '')) {
+      throw new ConfigError(
+        `spec "${name}": budget.maxBytes of ${maxBytes} exceeds the default ${defaultMax} ` +
+          'and needs a `why`. It is printed in the allocation table, so the trade is ' +
+          'visible against the other specs rather than absorbed silently',
+      );
+    }
+  }
+
   const model = {
     name,
     lib,
+    maxBytes: raw.budget?.maxBytes ?? defaultMax,
     specPath: raw.spec,
     module: raw.module ?? null,
     driver: raw.driver ?? null,
@@ -148,6 +174,8 @@ export function buildModel(name, raw, config) {
     /// Optional `{ minSteps: { action: n } }`. Enforced by `check`, not `gen`,
     /// so it guards the committed traces rather than one run.
     coverage: raw.coverage ?? null,
+    /// Optional `{ maxBytes, why }`. Absent means the default cap applies.
+    budget: raw.budget ?? null,
     qualify: (node) => qualified(node, lib),
   };
 

@@ -4,7 +4,8 @@
     "format-description": "https://apalache-mc.org/docs/adr/015adr-trace.html",
     "source": "examples/counter/spec/counter.qnt",
     "status": "ok",
-    "description": "Created by Quint; regenerate with `quint-sol-connect gen`"
+    "description": "Created by Quint; regenerate with `quint-sol-connect gen`",
+    "exemplarOf": "trace-000.json"
   },
   "vars": [
     "count",
@@ -57,7 +58,46 @@
         "index": 1
       },
       "count": {
-        "#bigint": "0"
+        "#bigint": "2"
+      },
+      "entries": {
+        "#map": []
+      },
+      "mbt::actionTaken": "increment",
+      "mbt::nondetPicks": {
+        "by": {
+          "tag": "Some",
+          "value": {
+            "#bigint": "2"
+          }
+        },
+        "key": {
+          "tag": "None",
+          "value": {
+            "#tup": []
+          }
+        }
+      },
+      "seen": {
+        "#set": [
+          {
+            "#bigint": "2"
+          }
+        ]
+      },
+      "status": {
+        "tag": "Running",
+        "value": {
+          "#tup": []
+        }
+      }
+    },
+    {
+      "#meta": {
+        "index": 2
+      },
+      "count": {
+        "#bigint": "2"
       },
       "entries": {
         "#map": [
@@ -90,56 +130,9 @@
         }
       },
       "seen": {
-        "#set": []
-      },
-      "status": {
-        "tag": "Running",
-        "value": {
-          "#tup": []
-        }
-      }
-    },
-    {
-      "#meta": {
-        "index": 2
-      },
-      "count": {
-        "#bigint": "7"
-      },
-      "entries": {
-        "#map": [
-          [
-            {
-              "#bigint": "0"
-            },
-            {
-              "flagged": false,
-              "hits": {
-                "#bigint": "1"
-              }
-            }
-          ]
-        ]
-      },
-      "mbt::actionTaken": "increment",
-      "mbt::nondetPicks": {
-        "by": {
-          "tag": "Some",
-          "value": {
-            "#bigint": "7"
-          }
-        },
-        "key": {
-          "tag": "None",
-          "value": {
-            "#tup": []
-          }
-        }
-      },
-      "seen": {
         "#set": [
           {
-            "#bigint": "7"
+            "#bigint": "2"
           }
         ]
       },
@@ -155,7 +148,7 @@
         "index": 3
       },
       "count": {
-        "#bigint": "13"
+        "#bigint": "9"
       },
       "entries": {
         "#map": [
@@ -177,7 +170,7 @@
         "by": {
           "tag": "Some",
           "value": {
-            "#bigint": "6"
+            "#bigint": "7"
           }
         },
         "key": {
@@ -190,7 +183,7 @@
       "seen": {
         "#set": [
           {
-            "#bigint": "6"
+            "#bigint": "2"
           },
           {
             "#bigint": "7"
@@ -209,228 +202,13 @@
         "index": 4
       },
       "count": {
-        "#bigint": "13"
+        "#bigint": "9"
       },
       "entries": {
         "#map": [
           [
             {
               "#bigint": "0"
-            },
-            {
-              "flagged": false,
-              "hits": {
-                "#bigint": "1"
-              }
-            }
-          ],
-          [
-            {
-              "#bigint": "2"
-            },
-            {
-              "flagged": false,
-              "hits": {
-                "#bigint": "1"
-              }
-            }
-          ]
-        ]
-      },
-      "mbt::actionTaken": "touch",
-      "mbt::nondetPicks": {
-        "by": {
-          "tag": "None",
-          "value": {
-            "#tup": []
-          }
-        },
-        "key": {
-          "tag": "Some",
-          "value": {
-            "#bigint": "2"
-          }
-        }
-      },
-      "seen": {
-        "#set": [
-          {
-            "#bigint": "6"
-          },
-          {
-            "#bigint": "7"
-          }
-        ]
-      },
-      "status": {
-        "tag": "Running",
-        "value": {
-          "#tup": []
-        }
-      }
-    },
-    {
-      "#meta": {
-        "index": 5
-      },
-      "count": {
-        "#bigint": "18"
-      },
-      "entries": {
-        "#map": [
-          [
-            {
-              "#bigint": "0"
-            },
-            {
-              "flagged": false,
-              "hits": {
-                "#bigint": "1"
-              }
-            }
-          ],
-          [
-            {
-              "#bigint": "2"
-            },
-            {
-              "flagged": false,
-              "hits": {
-                "#bigint": "1"
-              }
-            }
-          ]
-        ]
-      },
-      "mbt::actionTaken": "increment",
-      "mbt::nondetPicks": {
-        "by": {
-          "tag": "Some",
-          "value": {
-            "#bigint": "5"
-          }
-        },
-        "key": {
-          "tag": "None",
-          "value": {
-            "#tup": []
-          }
-        }
-      },
-      "seen": {
-        "#set": [
-          {
-            "#bigint": "5"
-          },
-          {
-            "#bigint": "6"
-          },
-          {
-            "#bigint": "7"
-          }
-        ]
-      },
-      "status": {
-        "tag": "Running",
-        "value": {
-          "#tup": []
-        }
-      }
-    },
-    {
-      "#meta": {
-        "index": 6
-      },
-      "count": {
-        "#bigint": "27"
-      },
-      "entries": {
-        "#map": [
-          [
-            {
-              "#bigint": "0"
-            },
-            {
-              "flagged": false,
-              "hits": {
-                "#bigint": "1"
-              }
-            }
-          ],
-          [
-            {
-              "#bigint": "2"
-            },
-            {
-              "flagged": false,
-              "hits": {
-                "#bigint": "1"
-              }
-            }
-          ]
-        ]
-      },
-      "mbt::actionTaken": "increment",
-      "mbt::nondetPicks": {
-        "by": {
-          "tag": "Some",
-          "value": {
-            "#bigint": "9"
-          }
-        },
-        "key": {
-          "tag": "None",
-          "value": {
-            "#tup": []
-          }
-        }
-      },
-      "seen": {
-        "#set": [
-          {
-            "#bigint": "5"
-          },
-          {
-            "#bigint": "6"
-          },
-          {
-            "#bigint": "7"
-          },
-          {
-            "#bigint": "9"
-          }
-        ]
-      },
-      "status": {
-        "tag": "Running",
-        "value": {
-          "#tup": []
-        }
-      }
-    },
-    {
-      "#meta": {
-        "index": 7
-      },
-      "count": {
-        "#bigint": "27"
-      },
-      "entries": {
-        "#map": [
-          [
-            {
-              "#bigint": "0"
-            },
-            {
-              "flagged": false,
-              "hits": {
-                "#bigint": "1"
-              }
-            }
-          ],
-          [
-            {
-              "#bigint": "2"
             },
             {
               "flagged": false,
@@ -470,16 +248,244 @@
       "seen": {
         "#set": [
           {
-            "#bigint": "5"
-          },
-          {
-            "#bigint": "6"
+            "#bigint": "2"
           },
           {
             "#bigint": "7"
+          }
+        ]
+      },
+      "status": {
+        "tag": "Running",
+        "value": {
+          "#tup": []
+        }
+      }
+    },
+    {
+      "#meta": {
+        "index": 5
+      },
+      "count": {
+        "#bigint": "9"
+      },
+      "entries": {
+        "#map": [
+          [
+            {
+              "#bigint": "0"
+            },
+            {
+              "flagged": false,
+              "hits": {
+                "#bigint": "1"
+              }
+            }
+          ],
+          [
+            {
+              "#bigint": "1"
+            },
+            {
+              "flagged": false,
+              "hits": {
+                "#bigint": "1"
+              }
+            }
+          ],
+          [
+            {
+              "#bigint": "3"
+            },
+            {
+              "flagged": false,
+              "hits": {
+                "#bigint": "1"
+              }
+            }
+          ]
+        ]
+      },
+      "mbt::actionTaken": "touch",
+      "mbt::nondetPicks": {
+        "by": {
+          "tag": "None",
+          "value": {
+            "#tup": []
+          }
+        },
+        "key": {
+          "tag": "Some",
+          "value": {
+            "#bigint": "1"
+          }
+        }
+      },
+      "seen": {
+        "#set": [
+          {
+            "#bigint": "2"
           },
           {
-            "#bigint": "9"
+            "#bigint": "7"
+          }
+        ]
+      },
+      "status": {
+        "tag": "Running",
+        "value": {
+          "#tup": []
+        }
+      }
+    },
+    {
+      "#meta": {
+        "index": 6
+      },
+      "count": {
+        "#bigint": "14"
+      },
+      "entries": {
+        "#map": [
+          [
+            {
+              "#bigint": "0"
+            },
+            {
+              "flagged": false,
+              "hits": {
+                "#bigint": "1"
+              }
+            }
+          ],
+          [
+            {
+              "#bigint": "1"
+            },
+            {
+              "flagged": false,
+              "hits": {
+                "#bigint": "1"
+              }
+            }
+          ],
+          [
+            {
+              "#bigint": "3"
+            },
+            {
+              "flagged": false,
+              "hits": {
+                "#bigint": "1"
+              }
+            }
+          ]
+        ]
+      },
+      "mbt::actionTaken": "increment",
+      "mbt::nondetPicks": {
+        "by": {
+          "tag": "Some",
+          "value": {
+            "#bigint": "5"
+          }
+        },
+        "key": {
+          "tag": "None",
+          "value": {
+            "#tup": []
+          }
+        }
+      },
+      "seen": {
+        "#set": [
+          {
+            "#bigint": "2"
+          },
+          {
+            "#bigint": "5"
+          },
+          {
+            "#bigint": "7"
+          }
+        ]
+      },
+      "status": {
+        "tag": "Running",
+        "value": {
+          "#tup": []
+        }
+      }
+    },
+    {
+      "#meta": {
+        "index": 7
+      },
+      "count": {
+        "#bigint": "14"
+      },
+      "entries": {
+        "#map": [
+          [
+            {
+              "#bigint": "0"
+            },
+            {
+              "flagged": false,
+              "hits": {
+                "#bigint": "1"
+              }
+            }
+          ],
+          [
+            {
+              "#bigint": "1"
+            },
+            {
+              "flagged": true,
+              "hits": {
+                "#bigint": "2"
+              }
+            }
+          ],
+          [
+            {
+              "#bigint": "3"
+            },
+            {
+              "flagged": false,
+              "hits": {
+                "#bigint": "1"
+              }
+            }
+          ]
+        ]
+      },
+      "mbt::actionTaken": "touch",
+      "mbt::nondetPicks": {
+        "by": {
+          "tag": "None",
+          "value": {
+            "#tup": []
+          }
+        },
+        "key": {
+          "tag": "Some",
+          "value": {
+            "#bigint": "1"
+          }
+        }
+      },
+      "seen": {
+        "#set": [
+          {
+            "#bigint": "2"
+          },
+          {
+            "#bigint": "5"
+          },
+          {
+            "#bigint": "7"
           }
         ]
       },
@@ -495,7 +501,7 @@
         "index": 8
       },
       "count": {
-        "#bigint": "27"
+        "#bigint": "14"
       },
       "entries": {
         "#map": [
@@ -504,9 +510,99 @@
               "#bigint": "0"
             },
             {
+              "flagged": false,
+              "hits": {
+                "#bigint": "1"
+              }
+            }
+          ],
+          [
+            {
+              "#bigint": "1"
+            },
+            {
               "flagged": true,
               "hits": {
-                "#bigint": "2"
+                "#bigint": "3"
+              }
+            }
+          ],
+          [
+            {
+              "#bigint": "3"
+            },
+            {
+              "flagged": false,
+              "hits": {
+                "#bigint": "1"
+              }
+            }
+          ]
+        ]
+      },
+      "mbt::actionTaken": "touch",
+      "mbt::nondetPicks": {
+        "by": {
+          "tag": "None",
+          "value": {
+            "#tup": []
+          }
+        },
+        "key": {
+          "tag": "Some",
+          "value": {
+            "#bigint": "1"
+          }
+        }
+      },
+      "seen": {
+        "#set": [
+          {
+            "#bigint": "2"
+          },
+          {
+            "#bigint": "5"
+          },
+          {
+            "#bigint": "7"
+          }
+        ]
+      },
+      "status": {
+        "tag": "Running",
+        "value": {
+          "#tup": []
+        }
+      }
+    },
+    {
+      "#meta": {
+        "index": 9
+      },
+      "count": {
+        "#bigint": "14"
+      },
+      "entries": {
+        "#map": [
+          [
+            {
+              "#bigint": "0"
+            },
+            {
+              "flagged": false,
+              "hits": {
+                "#bigint": "1"
+              }
+            }
+          ],
+          [
+            {
+              "#bigint": "1"
+            },
+            {
+              "flagged": true,
+              "hits": {
+                "#bigint": "3"
               }
             }
           ],
@@ -545,23 +641,20 @@
         "key": {
           "tag": "Some",
           "value": {
-            "#bigint": "0"
+            "#bigint": "2"
           }
         }
       },
       "seen": {
         "#set": [
           {
+            "#bigint": "2"
+          },
+          {
             "#bigint": "5"
           },
           {
-            "#bigint": "6"
-          },
-          {
             "#bigint": "7"
-          },
-          {
-            "#bigint": "9"
           }
         ]
       },
@@ -574,10 +667,10 @@
     },
     {
       "#meta": {
-        "index": 9
+        "index": 10
       },
       "count": {
-        "#bigint": "36"
+        "#bigint": "21"
       },
       "entries": {
         "#map": [
@@ -586,9 +679,110 @@
               "#bigint": "0"
             },
             {
+              "flagged": false,
+              "hits": {
+                "#bigint": "1"
+              }
+            }
+          ],
+          [
+            {
+              "#bigint": "1"
+            },
+            {
               "flagged": true,
               "hits": {
-                "#bigint": "2"
+                "#bigint": "3"
+              }
+            }
+          ],
+          [
+            {
+              "#bigint": "2"
+            },
+            {
+              "flagged": false,
+              "hits": {
+                "#bigint": "1"
+              }
+            }
+          ],
+          [
+            {
+              "#bigint": "3"
+            },
+            {
+              "flagged": false,
+              "hits": {
+                "#bigint": "1"
+              }
+            }
+          ]
+        ]
+      },
+      "mbt::actionTaken": "increment",
+      "mbt::nondetPicks": {
+        "by": {
+          "tag": "Some",
+          "value": {
+            "#bigint": "7"
+          }
+        },
+        "key": {
+          "tag": "None",
+          "value": {
+            "#tup": []
+          }
+        }
+      },
+      "seen": {
+        "#set": [
+          {
+            "#bigint": "2"
+          },
+          {
+            "#bigint": "5"
+          },
+          {
+            "#bigint": "7"
+          }
+        ]
+      },
+      "status": {
+        "tag": "Running",
+        "value": {
+          "#tup": []
+        }
+      }
+    },
+    {
+      "#meta": {
+        "index": 11
+      },
+      "count": {
+        "#bigint": "30"
+      },
+      "entries": {
+        "#map": [
+          [
+            {
+              "#bigint": "0"
+            },
+            {
+              "flagged": false,
+              "hits": {
+                "#bigint": "1"
+              }
+            }
+          ],
+          [
+            {
+              "#bigint": "1"
+            },
+            {
+              "flagged": true,
+              "hits": {
+                "#bigint": "3"
               }
             }
           ],
@@ -634,174 +828,10 @@
       "seen": {
         "#set": [
           {
-            "#bigint": "5"
-          },
-          {
-            "#bigint": "6"
-          },
-          {
-            "#bigint": "7"
-          },
-          {
-            "#bigint": "9"
-          }
-        ]
-      },
-      "status": {
-        "tag": "Running",
-        "value": {
-          "#tup": []
-        }
-      }
-    },
-    {
-      "#meta": {
-        "index": 10
-      },
-      "count": {
-        "#bigint": "36"
-      },
-      "entries": {
-        "#map": [
-          [
-            {
-              "#bigint": "0"
-            },
-            {
-              "flagged": true,
-              "hits": {
-                "#bigint": "2"
-              }
-            }
-          ],
-          [
-            {
-              "#bigint": "2"
-            },
-            {
-              "flagged": true,
-              "hits": {
-                "#bigint": "2"
-              }
-            }
-          ],
-          [
-            {
-              "#bigint": "3"
-            },
-            {
-              "flagged": false,
-              "hits": {
-                "#bigint": "1"
-              }
-            }
-          ]
-        ]
-      },
-      "mbt::actionTaken": "touch",
-      "mbt::nondetPicks": {
-        "by": {
-          "tag": "None",
-          "value": {
-            "#tup": []
-          }
-        },
-        "key": {
-          "tag": "Some",
-          "value": {
             "#bigint": "2"
-          }
-        }
-      },
-      "seen": {
-        "#set": [
+          },
           {
             "#bigint": "5"
-          },
-          {
-            "#bigint": "6"
-          },
-          {
-            "#bigint": "7"
-          },
-          {
-            "#bigint": "9"
-          }
-        ]
-      },
-      "status": {
-        "tag": "Running",
-        "value": {
-          "#tup": []
-        }
-      }
-    },
-    {
-      "#meta": {
-        "index": 11
-      },
-      "count": {
-        "#bigint": "36"
-      },
-      "entries": {
-        "#map": [
-          [
-            {
-              "#bigint": "0"
-            },
-            {
-              "flagged": true,
-              "hits": {
-                "#bigint": "3"
-              }
-            }
-          ],
-          [
-            {
-              "#bigint": "2"
-            },
-            {
-              "flagged": true,
-              "hits": {
-                "#bigint": "2"
-              }
-            }
-          ],
-          [
-            {
-              "#bigint": "3"
-            },
-            {
-              "flagged": false,
-              "hits": {
-                "#bigint": "1"
-              }
-            }
-          ]
-        ]
-      },
-      "mbt::actionTaken": "touch",
-      "mbt::nondetPicks": {
-        "by": {
-          "tag": "None",
-          "value": {
-            "#tup": []
-          }
-        },
-        "key": {
-          "tag": "Some",
-          "value": {
-            "#bigint": "0"
-          }
-        }
-      },
-      "seen": {
-        "#set": [
-          {
-            "#bigint": "5"
-          },
-          {
-            "#bigint": "6"
           },
           {
             "#bigint": "7"
@@ -823,13 +853,24 @@
         "index": 12
       },
       "count": {
-        "#bigint": "36"
+        "#bigint": "30"
       },
       "entries": {
         "#map": [
           [
             {
               "#bigint": "0"
+            },
+            {
+              "flagged": false,
+              "hits": {
+                "#bigint": "1"
+              }
+            }
+          ],
+          [
+            {
+              "#bigint": "1"
             },
             {
               "flagged": true,
@@ -843,9 +884,9 @@
               "#bigint": "2"
             },
             {
-              "flagged": true,
+              "flagged": false,
               "hits": {
-                "#bigint": "2"
+                "#bigint": "1"
               }
             }
           ],
@@ -854,15 +895,15 @@
               "#bigint": "3"
             },
             {
-              "flagged": true,
+              "flagged": false,
               "hits": {
-                "#bigint": "2"
+                "#bigint": "1"
               }
             }
           ]
         ]
       },
-      "mbt::actionTaken": "touch",
+      "mbt::actionTaken": "finish",
       "mbt::nondetPicks": {
         "by": {
           "tag": "None",
@@ -871,19 +912,19 @@
           }
         },
         "key": {
-          "tag": "Some",
+          "tag": "None",
           "value": {
-            "#bigint": "3"
+            "#tup": []
           }
         }
       },
       "seen": {
         "#set": [
           {
-            "#bigint": "5"
+            "#bigint": "2"
           },
           {
-            "#bigint": "6"
+            "#bigint": "5"
           },
           {
             "#bigint": "7"
@@ -894,7 +935,7 @@
         ]
       },
       "status": {
-        "tag": "Running",
+        "tag": "Done",
         "value": {
           "#tup": []
         }

@@ -11,7 +11,8 @@
 import fs from 'node:fs';
 import path from 'node:path';
 
-import { TOOL_VERSION } from './gen.mjs';
+import { TOOL_VERSION, EXEMPLAR_ITF, ITF_SCRATCH_DIR } from './gen.mjs';
+import { attribute, explain, humanBytes } from './budget.mjs';
 
 const cap = (s) => s.charAt(0).toUpperCase() + s.slice(1);
 const posix = (p) => p.split(path.sep).join('/');
@@ -46,6 +47,7 @@ export function checkModel(model, root) {
   const schemaDrift = [];
   const versionDrift = new Map();
   const observed = new Map();
+  const exemplars = [];
 
   for (const f of fixtures) {
     const abs = path.join(fixtureDir, f);
@@ -72,10 +74,36 @@ export function checkModel(model, root) {
     if (typeof fixture.steps !== 'string' || !fixture.steps.startsWith('0x')) {
       problems.push(`${f}: "steps" is not a hex blob`);
     }
-    const itf = path.resolve(root, meta.itf ?? '');
-    if (!meta.itf || !fs.existsSync(itf)) {
-      problems.push(`${f}: its ITF companion (${meta.itf}) is missing`);
+    if (meta.exemplar) {
+      exemplars.push(f);
+      const itf = path.resolve(root, meta.itf ?? '');
+      if (!meta.itf || !fs.existsSync(itf)) {
+        problems.push(`${f}: it is the exemplar but its ITF (${meta.itf}) is missing`);
+      }
     }
+  }
+
+  // Exactly one ITF companion per spec, under a fixed name.
+  if (fixtures.length && exemplars.length !== 1) {
+    problems.push(
+      exemplars.length === 0
+        ? `no fixture is marked \`exemplar\` - regenerate so one ITF companion is kept`
+        : `${exemplars.length} fixtures are marked \`exemplar\` (${exemplars.join(', ')}); expected 1`,
+    );
+  }
+
+  // The inverse check. Without it an ITF written before the exemplar rule
+  // lingers forever and quietly spends the byte budget.
+  const strayItf = fs
+    .readdirSync(fixtureDir)
+    .filter((f) => f.endsWith('.itf.json') && f !== EXEMPLAR_ITF);
+  // `<fixtures>/.itf/` is the scratch area `gen --itf` writes to; it is
+  // git-ignored and deliberately not counted as stale.
+  if (strayItf.length) {
+    problems.push(
+      `stale ITF companion(s): ${strayItf.join(', ')}. Only ${EXEMPLAR_ITF} is kept now; ` +
+        'delete these (`gen --itf <n>` rewrites one on demand for triage)',
+    );
   }
 
   if (schemaDrift.length) {
@@ -174,5 +202,38 @@ export function checkModel(model, root) {
     }
   }
 
-  return { problems, fixtures: fixtures.length };
+  // Byte budget. Enforced here rather than in `gen` for the same reason the
+  // coverage floors are: `gen` guards one run, `check` guards the committed
+  // artifact, and `check` runs in CI without node's quint dependency.
+  const bytes = fixtures.reduce(
+    (n, f) => n + fs.statSync(path.join(fixtureDir, f)).size,
+    0,
+  ) + strayBytes(fixtureDir);
+  const capBytes = model.maxBytes;
+  const warnings = [];
+
+  if (bytes > capBytes || bytes > capBytes * 0.8) {
+    let attribution = null;
+    try {
+      const first = JSON.parse(fs.readFileSync(path.join(fixtureDir, fixtures[0]), 'utf8'));
+      attribution = attribute(model, first.steps);
+    } catch {
+      // Attribution is a diagnostic, never a reason to fail the check.
+    }
+    const lines = explain(model, bytes, capBytes, attribution);
+    if (bytes > capBytes) problems.push(`over the byte budget: ${lines.join('\n  ')}`);
+    // Warn well before the wall, so the commit that legitimately adds an action
+    // is not the one that first meets the gate.
+    else warnings.push(`approaching the byte budget: ${lines.join('\n  ')}`);
+  }
+
+  return { problems, warnings, fixtures: fixtures.length, bytes, cap: capBytes };
+}
+
+/** ITF companions count against the budget too - they are committed bytes. */
+function strayBytes(dir) {
+  return fs
+    .readdirSync(dir)
+    .filter((f) => f.endsWith('.itf.json'))
+    .reduce((n, f) => n + fs.statSync(path.join(dir, f)).size, 0);
 }

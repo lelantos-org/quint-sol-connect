@@ -80,8 +80,37 @@ export function stableItf(raw) {
   return { ...raw, '#meta': meta };
 }
 
+/** The one ITF companion a spec commits. */
+export const EXEMPLAR_ITF = 'exemplar.itf.json';
+/** Where `gen --itf <n>` puts triage companions. Git-ignored, never committed. */
+export const ITF_SCRATCH_DIR = '.itf';
+
+/**
+ * The trace whose ITF is worth keeping: the one that exercised every action at
+ * least once, and the most of whichever action it exercised least.
+ *
+ * The sample exists to be read as an example of what the model does, so the
+ * example wanted is the one that did the most different things - not trace 0,
+ * which is merely the first.
+ */
+export function pickExemplar(decoded, model) {
+  const names = model.actions.map((a) => a.name);
+  let best = 0;
+  let bestScore = -1;
+  for (const { i, counts } of decoded) {
+    const score = Math.min(...names.map((n) => counts.get(n) ?? 0));
+    if (score > bestScore) {
+      bestScore = score;
+      best = i;
+    }
+  }
+  return best;
+}
+
+const itfWanted = (want, i) => want === 'all' || (want instanceof Set && want.has(i));
+
 /** Generate everything for one model. Returns a summary for reporting. */
-export function generateSpec(model, { root, quintBin, quintVer, fresh, outOverride, solOutOverride, runOverride, runtimeImport, cmd, format }) {
+export function generateSpec(model, { root, quintBin, quintVer, fresh, outOverride, solOutOverride, runOverride, runtimeImport, cmd, format, itfIndices = null }) {
   const run = { ...model.run, ...(runOverride ?? {}) };
   if (fresh) run.seed = `0x${Buffer.from(crypto.getRandomValues(new Uint8Array(8))).toString('hex')}`;
 
@@ -112,26 +141,53 @@ export function generateSpec(model, { root, quintBin, quintVer, fresh, outOverri
     const totals = new Map(model.actions.map((a) => [a.name, 0]));
     const fixtures = [];
 
-    files.forEach((file, i) => {
+    // Decode every trace first: the exemplar can only be chosen once all of
+    // them are known.
+    const decoded = files.map((file, i) => {
       const rawTrace = JSON.parse(fs.readFileSync(file, 'utf8'));
       const trace = decodeTrace(rawTrace, { file: path.basename(file) });
       const counts = indexActions(model, trace, path.basename(file));
       for (const [name, n] of counts) totals.set(name, totals.get(name) + n);
+      return { i, rawTrace, trace, counts };
+    });
 
-      const itfName = `trace-${pad3(i)}.itf.json`;
+    const exemplar = pickExemplar(decoded, model);
+
+    decoded.forEach(({ i, rawTrace, trace, counts }) => {
       const jsonName = `trace-${pad3(i)}.json`;
       const testName = `test_quint_${model.name}_${pad3(i)}`;
+      const isExemplar = i === exemplar;
 
-      // The ITF is committed next to the blob: it is what the ITF Trace Viewer
-      // opens, and it is what makes a spec change reviewable in a pull request.
-      // Both of those need it stable and readable, so the wall-clock stamps
-      // Quint writes into `#meta` are normalised away and it is pretty-printed.
-      // Without that, every regeneration is a diff and the determinism gate
-      // that makes committing fixtures worthwhile cannot hold.
-      fs.writeFileSync(
-        path.join(absFixtureDir, itfName),
-        `${JSON.stringify(stableItf(rawTrace), null, 2)}\n`,
-      );
+      // Only the exemplar's ITF is written, and always under a fixed name.
+      //
+      // The ITF's jobs - triage, the Trace Viewer, reading a spec change in a
+      // pull request - are per-incident rather than per-run, and it is fully
+      // derivable from committed inputs: the seed and the run parameters are
+      // pinned, and `quint-diff` proves regeneration is byte-identical. A file
+      // derivable from committed inputs does not belong in git, and at roughly
+      // the size of the blob it doubled the cost of every spec.
+      //
+      // A fixed filename rather than `trace-007.itf.json` so `.gitignore` needs
+      // two static lines, and so a spec change shows as a content diff on one
+      // file instead of a rename plus a delete. `gen --itf <n>` writes any
+      // other trace's ITF on demand.
+      const itfName = isExemplar ? EXEMPLAR_ITF : `trace-${pad3(i)}.itf.json`;
+      if (isExemplar) {
+        const stable = stableItf(rawTrace);
+        stable['#meta'].exemplarOf = jsonName;
+        fs.writeFileSync(path.join(absFixtureDir, itfName), `${JSON.stringify(stable, null, 2)}\n`);
+      }
+      // Triage companions go to a scratch subdirectory, not beside the
+      // fixtures: they are for reading now, not for committing, and `check`
+      // treats any non-exemplar ITF in the fixture directory as stale.
+      if (!isExemplar && itfWanted(itfIndices, i)) {
+        const scratch = path.join(absFixtureDir, ITF_SCRATCH_DIR);
+        fs.mkdirSync(scratch, { recursive: true });
+        fs.writeFileSync(
+          path.join(scratch, itfName),
+          `${JSON.stringify(stableItf(rawTrace), null, 2)}\n`,
+        );
+      }
 
       const blob = encodeTrace(model, trace, { file: jsonName });
       const meta = {
@@ -149,7 +205,7 @@ export function generateSpec(model, { root, quintBin, quintVer, fresh, outOverri
         actionCounts: Object.fromEntries(counts),
         schemaHash: model.schemaHash,
         testName,
-        itf: `${fixtureDir}/${itfName}`,
+        ...(isExemplar ? { exemplar: true, itf: `${fixtureDir}/${itfName}` } : {}),
       };
       fs.writeFileSync(
         path.join(absFixtureDir, jsonName),
@@ -201,7 +257,7 @@ export function generateSpec(model, { root, quintBin, quintVer, fresh, outOverri
 
     const fmt = format === false ? { formatted: false, reason: 'disabled in config' } : formatSolidity(root, written);
 
-    return { model, fixtures, totals, seed: run.seed, fixtureDir, solDir, fmt, scratch };
+    return { model, fixtures, totals, seed: run.seed, fixtureDir, solDir, fmt, scratch, exemplar };
   } finally {
     fs.rmSync(tmp, { recursive: true, force: true });
   }

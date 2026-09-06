@@ -3,3 +3,6 @@ out/
 cache/
 broadcast/
 .DS_Store
+
+# `gen --itf <n>` triage companions: read now, never committed.
+.itf/

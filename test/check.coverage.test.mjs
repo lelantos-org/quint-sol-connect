@@ -34,11 +34,12 @@ function tree(counts, coverage) {
     actions: ['go', 'stop'],
     schemaHash: model.schemaHash,
     testName: 'test_quint_demo_000',
-    itf: 'fix/demo/trace-000.itf.json',
+    exemplar: true,
+    itf: 'fix/demo/exemplar.itf.json',
     ...(counts ? { actionCounts: counts } : {}),
   };
   fs.writeFileSync(path.join(dir, 'trace-000.json'), JSON.stringify({ meta, steps: '0x00' }));
-  fs.writeFileSync(path.join(dir, 'trace-000.itf.json'), '{}');
+  fs.writeFileSync(path.join(dir, 'exemplar.itf.json'), '{}');
 
   const gen = path.join(root, 'gen');
   fs.mkdirSync(gen, { recursive: true });

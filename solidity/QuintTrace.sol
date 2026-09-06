@@ -44,7 +44,11 @@ library QuintTrace {
         meta.quintVersion = VM.parseJsonString(json, ".meta.quintVersion");
         meta.toolVersion = VM.parseJsonString(json, ".meta.toolVersion");
         meta.seed = VM.parseJsonString(json, ".meta.seed");
-        meta.itf = VM.parseJsonString(json, ".meta.itf");
+        // Only the exemplar trace commits an ITF companion; the rest are
+        // regenerated on demand with `gen --itf <n>`. So this key is usually
+        // absent, and reading it unconditionally would revert on every
+        // non-exemplar fixture.
+        meta.itf = VM.keyExistsJson(json, ".meta.itf") ? VM.parseJsonString(json, ".meta.itf") : "";
         meta.testName = VM.parseJsonString(json, ".meta.testName");
         meta.traceIndex = VM.parseJsonUint(json, ".meta.traceIndex");
         meta.steps = VM.parseJsonUint(json, ".meta.steps");

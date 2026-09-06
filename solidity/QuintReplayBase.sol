@@ -103,6 +103,19 @@ abstract contract QuintReplayBase is Test {
         return 1;
     }
 
+    /// The readable trace, if this one committed a companion. Only the exemplar
+    /// does; for the rest, say how to get one rather than printing nothing.
+    function _logItf() private view {
+        if (bytes(_meta.itf).length != 0) {
+            console2.log("    itf    : %s", _meta.itf);
+        } else {
+            console2.log(
+                "    itf    : not committed - `quint-sol-connect gen --itf %s` writes it",
+                vm.toString(_meta.traceIndex)
+            );
+        }
+    }
+
     /// `name[i]` without string concatenation at every call site.
     function _idx(string memory name, uint256 i, string memory field) internal pure returns (string memory) {
         return string.concat(name, "[", vm.toString(i), "].", field);
@@ -117,7 +130,7 @@ abstract contract QuintReplayBase is Test {
         console2.log("  MODEL / IMPLEMENTATION DIVERGENCE");
         console2.log("    spec   : %s", _meta.spec);
         console2.log("    trace  : %s", _tracePath);
-        console2.log("    itf    : %s", _meta.itf);
+        _logItf();
         console2.log("    step   : %s of %s", vm.toString(_stepIndex), vm.toString(_meta.steps));
         console2.log("    action : %s", action);
         console2.log("    fields : %s diverged (listed above)", vm.toString(_mismatches));
@@ -149,7 +162,7 @@ abstract contract QuintReplayBase is Test {
         }
         console2.log("    spec   : %s", _meta.spec);
         console2.log("    trace  : %s", _tracePath);
-        console2.log("    itf    : %s", _meta.itf);
+        _logItf();
         console2.log("");
         console2.log("  Either the model is missing a guard the implementation has, or the");
         console2.log("  implementation gained one the model does not know about. A negative");
