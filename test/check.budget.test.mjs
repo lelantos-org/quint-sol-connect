@@ -1,12 +1,11 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
-import os from 'node:os';
 import path from 'node:path';
 
-import { buildModel } from '../src/config.mjs';
 import { checkModel } from '../src/check.mjs';
-import { TOOL_VERSION, EXEMPLAR_ITF } from '../src/gen.mjs';
+import { EXEMPLAR_ITF } from '../src/gen.mjs';
+import { fixtureTree } from './helpers/fixtureTree.mjs';
 
 const SPEC = {
   spec: 'spec/demo.qnt',
@@ -17,40 +16,14 @@ const SPEC = {
   actions: { go: {} },
 };
 
-/** A tree `checkModel` considers clean, with `blobBytes` of padding in the blob. */
-function tree({ budget, blobBytes = 8, exemplar = true, extraItf = null } = {}) {
-  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'qcs-budget-'));
-  const model = buildModel('demo', budget ? { ...SPEC, budget } : SPEC, {});
-
-  const dir = path.join(root, 'fix', 'demo');
-  fs.mkdirSync(dir, { recursive: true });
-  const meta = {
-    spec: SPEC.spec,
-    toolVersion: TOOL_VERSION,
-    schemaHash: model.schemaHash,
-    testName: 'test_quint_demo_000',
-    ...(exemplar ? { exemplar: true, itf: `fix/demo/${EXEMPLAR_ITF}` } : {}),
-  };
-  fs.writeFileSync(
-    path.join(dir, 'trace-000.json'),
-    JSON.stringify({ meta, steps: `0x${'ab'.repeat(blobBytes)}` }),
-  );
-  if (exemplar) fs.writeFileSync(path.join(dir, EXEMPLAR_ITF), '{}');
-  if (extraItf) fs.writeFileSync(path.join(dir, extraItf), '{}');
-
-  const gen = path.join(root, 'gen');
-  fs.mkdirSync(gen, { recursive: true });
-  fs.writeFileSync(
-    path.join(gen, 'DemoSpec.sol'),
-    `library DemoSpec { bytes32 internal constant SCHEMA_HASH = ${model.schemaHash}; }`,
-  );
-  fs.writeFileSync(path.join(gen, 'DemoSpecReplay.sol'), '');
-  fs.writeFileSync(
-    path.join(gen, 'DemoTraces.t.sol'),
-    'function test_quint_demo_000() public { _replay("fix/demo/trace-000.json"); }',
-  );
-  return { model, root };
-}
+/** A clean tree with `blobBytes` of padding in the blob. */
+const tree = ({ budget, blobBytes = 8, exemplar = true, extraItf = null } = {}) =>
+  fixtureTree({
+    spec: budget ? { ...SPEC, budget } : SPEC,
+    blob: `0x${'ab'.repeat(blobBytes)}`,
+    exemplar,
+    extraItf,
+  });
 
 // --- the byte budget -------------------------------------------------------
 

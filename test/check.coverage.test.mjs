@@ -1,12 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import fs from 'node:fs';
-import os from 'node:os';
-import path from 'node:path';
 
-import { buildModel } from '../src/config.mjs';
 import { checkModel } from '../src/check.mjs';
-import { TOOL_VERSION } from '../src/gen.mjs';
+import { fixtureTree } from './helpers/fixtureTree.mjs';
 
 const SPEC = {
   spec: 'spec/demo.qnt',
@@ -17,45 +13,12 @@ const SPEC = {
   actions: { go: {}, stop: {} },
 };
 
-/** A tree `checkModel` considers consistent, with the given per-action counts. */
-function tree(counts, coverage) {
-  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'qcs-cov-'));
-  const model = buildModel('demo', coverage ? { ...SPEC, coverage } : SPEC, {});
-
-  const dir = path.join(root, 'fix', 'demo');
-  fs.mkdirSync(dir, { recursive: true });
-  const meta = {
-    spec: SPEC.spec,
-    quintVersion: '0.32.0',
-    toolVersion: TOOL_VERSION,
-    seed: '0x1',
-    traceIndex: 0,
-    steps: 3,
-    actions: ['go', 'stop'],
-    schemaHash: model.schemaHash,
-    testName: 'test_quint_demo_000',
-    exemplar: true,
-    itf: 'fix/demo/exemplar.itf.json',
-    ...(counts ? { actionCounts: counts } : {}),
-  };
-  fs.writeFileSync(path.join(dir, 'trace-000.json'), JSON.stringify({ meta, steps: '0x00' }));
-  fs.writeFileSync(path.join(dir, 'exemplar.itf.json'), '{}');
-
-  const gen = path.join(root, 'gen');
-  fs.mkdirSync(gen, { recursive: true });
-  fs.writeFileSync(
-    path.join(gen, 'DemoSpec.sol'),
-    `library DemoSpec { bytes32 internal constant SCHEMA_HASH = ${model.schemaHash}; }`,
-  );
-  fs.writeFileSync(path.join(gen, 'DemoSpecReplay.sol'), '');
-  // `check` also verifies every fixture is replayed by a test, so the stub has
-  // to name the fixture path the way the generator would.
-  fs.writeFileSync(
-    path.join(gen, 'DemoTraces.t.sol'),
-    'function test_quint_demo_000() public { _replay("fix/demo/trace-000.json"); }',
-  );
-  return { model, root };
-}
+/** A clean tree whose one fixture reports the given per-action counts. */
+const tree = (counts, coverage) =>
+  fixtureTree({
+    spec: coverage ? { ...SPEC, coverage } : SPEC,
+    meta: { actionCounts: counts ?? undefined },
+  });
 
 test('coverage floors pass when the traces meet them', () => {
   const { model, root } = tree({ go: 10, stop: 4 }, { minSteps: { go: 5, stop: 1 } });

@@ -11,8 +11,6 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { Command, InvalidArgumentError } from 'commander';
 
-import fsp from 'node:fs';
-
 import { loadConfig, buildModels, DEFAULT_TOTAL_BYTES } from '../src/config.mjs';
 import { humanBytes } from '../src/budget.mjs';
 import { generateSpec, coverageReport, resolveQuint, quintVersion, TOOL_VERSION } from '../src/gen.mjs';
@@ -34,7 +32,11 @@ program
   .name('quint-sol-connect')
   .description('Model-based testing for Solidity: replay Quint traces inside Foundry.')
   .version(TOOL_VERSION)
-  // Inherited so they can be written either before or after the subcommand.
+  // Inherited by every subcommand, and accepted on either side of it. That
+  // second half is why `enablePositionalOptions()` is not set: it would bind
+  // anything after the subcommand name to the subcommand, and `check -c foo`
+  // would fail with "unknown option". No subcommand takes an argument that
+  // could be mistaken for one of these, so there is nothing to disambiguate.
   .option('-c, --config <file>', 'config path (default: quint-sol-connect.config.mjs)')
   .option('-r, --root <dir>', 'project root (default: the working directory)')
   .option(
@@ -42,7 +44,6 @@ program
     "Solidity import prefix for the package's own contracts",
     'quint-sol-connect',
   )
-  .enablePositionalOptions()
   .showHelpAfterError();
 
 /** Options declared on the root command, resolved for whichever subcommand ran. */
@@ -243,14 +244,14 @@ program
 /** The `meta.quintVersion` recorded by the committed fixtures, if any. */
 function fixtureQuintVersion(root, model) {
   const dir = path.resolve(root, model.fixtureOut, model.name);
-  if (!fsp.existsSync(dir)) return null;
-  const f = fsp
+  if (!fs.existsSync(dir)) return null;
+  const f = fs
     .readdirSync(dir)
     .filter((x) => x.endsWith('.json') && !x.endsWith('.itf.json'))
     .sort()[0];
   if (!f) return null;
   try {
-    return JSON.parse(fsp.readFileSync(path.join(dir, f), 'utf8')).meta?.quintVersion ?? null;
+    return JSON.parse(fs.readFileSync(path.join(dir, f), 'utf8')).meta?.quintVersion ?? null;
   } catch {
     return null;
   }

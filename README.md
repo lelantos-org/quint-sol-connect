@@ -258,11 +258,24 @@ byte-identical no-op. That is what lets you commit the fixtures and gate CI on:
 quint-sol-connect gen && git diff --exit-code
 ```
 
-`quint-sol-connect check` verifies committed fixtures still match the config
-without running quint at all — it re-derives the schema hash and compares. The
-hash covers the action names as well as the type string, because reordering
-actions changes what each recorded `uint8` tag means while leaving the canonical
-type byte-identical.
+`quint-sol-connect check` verifies committed fixtures still match what produced
+them, without running quint at all. Three things are compared, because the
+fixtures have three inputs:
+
+- **The config shape**, via the schema hash. It covers the action names as well
+  as the type string, because reordering actions changes what each recorded
+  `uint8` tag means while leaving the canonical type byte-identical.
+- **The spec text**, via a hash of the `.qnt` file. The schema hash does not
+  cover the model at all, so without this a spec could be rewritten from top to
+  bottom and `check` would still report ok, against traces describing the
+  previous version. Only the named file is hashed — a spec that `import`s
+  another module gets no coverage of the imported file.
+- **The run parameters** — `seed`, `traces`, `maxSteps`, `maxSamples`,
+  `invariant`, `backend`. Every one of them changes which traces come out and
+  none of them touches the schema hash.
+
+The `gen && git diff --exit-code` gate above catches all three too, but it needs
+node and quint. `check` needs neither, which is the point of it.
 
 For a nightly sweep with real randomness, point a fresh run at scratch paths so
 it cannot disturb any of that:

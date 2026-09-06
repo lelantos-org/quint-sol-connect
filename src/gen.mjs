@@ -6,6 +6,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { createRequire } from 'node:module';
+import { keccak256, toHex } from 'viem';
 
 import { decodeTrace } from './itf.mjs';
 import { encodeTrace } from './lower.mjs';
@@ -18,6 +19,24 @@ export const TOOL_VERSION = require_('../package.json').version;
 
 const cap = (s) => s.charAt(0).toUpperCase() + s.slice(1);
 const pad3 = (n) => String(n).padStart(3, '0');
+
+/**
+ * Hash of the spec that produced a fixture.
+ *
+ * The schema hash covers the *config* - the state shape and the action names -
+ * and nothing else. Editing the model itself changes neither, so without this
+ * a spec can be rewritten and `check` still reports ok while the committed
+ * traces describe the previous version. That is the one drift the whole design
+ * exists to catch, and `quint-diff` catching it does not help: it needs node
+ * and quint, which is exactly what `check` is for.
+ *
+ * Only the named file is hashed. A spec that `import`s another module gets no
+ * coverage of the imported file, which is a real limit rather than an oversight
+ * - resolving Quint's import graph here would mean parsing it.
+ */
+export function hashSpec(root, specPath) {
+  return keccak256(toHex(fs.readFileSync(path.resolve(root, specPath))));
+}
 
 // Fixture paths are written into a Solidity string literal and into `meta.itf`,
 // both of which are read back by `vm.readFile`. `path.join` uses the host
@@ -139,6 +158,7 @@ export function generateSpec(model, { root, quintBin, quintVer, fresh, outOverri
     fs.rmSync(absFixtureDir, { recursive: true, force: true });
     fs.mkdirSync(absFixtureDir, { recursive: true });
 
+    const specHash = hashSpec(root, model.specPath);
     const totals = new Map(model.actions.map((a) => [a.name, 0]));
     const fixtures = [];
 
@@ -193,6 +213,9 @@ export function generateSpec(model, { root, quintBin, quintVer, fresh, outOverri
       const blob = encodeTrace(model, trace, { file: jsonName });
       const meta = {
         spec: model.specPath,
+        // Hash of the spec text. `check` re-reads the file and compares, which
+        // is what makes an edited model without a regeneration a failure.
+        specHash,
         module: model.module ?? '',
         quintVersion: quintVer,
         // The evaluator matters for reproducibility: the two backends do not
@@ -200,7 +223,16 @@ export function generateSpec(model, { root, quintBin, quintVer, fresh, outOverri
         backend: run.backend ?? 'rust',
         toolVersion: TOOL_VERSION,
         seed: String(run.seed ?? ''),
+        // The rest of the run parameters, for the same reason as `specHash`:
+        // each one changes which traces come out, none of them touches the
+        // schema hash, and `check` compares them all. Flat rather than nested
+        // because solidity/QuintTrace.sol parses this object by key path.
+        traces: run.traces,
+        maxSteps: run.maxSteps,
+        maxSamples: run.maxSamples,
+        invariant: run.invariant ?? '',
         traceIndex: i,
+        // The trace's actual length, as opposed to `maxSteps` above.
         steps: trace.steps.length,
         actions: model.actions.map((a) => a.name),
         // Per-action step counts, so `check` can enforce coverage floors

@@ -1,11 +1,16 @@
 {
   "meta": {
     "spec": "examples/counter/spec/counter.qnt",
+    "specHash": "0x51a52b31163ce6f12a297d5acb8542f15e784c9aa28e7f88ca9ade78afea6855",
     "module": "counter",
     "quintVersion": "0.32.0",
     "backend": "rust",
-    "toolVersion": "0.1.0",
+    "toolVersion": "0.2.0",
     "seed": "0x1a2b3c4d",
+    "traces": 12,
+    "maxSteps": 12,
+    "maxSamples": 5000,
+    "invariant": "allInvariants",
     "traceIndex": 11,
     "steps": 13,
     "actions": [

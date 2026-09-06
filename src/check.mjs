@@ -11,7 +11,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 
-import { TOOL_VERSION, EXEMPLAR_ITF, ITF_SCRATCH_DIR } from './gen.mjs';
+import { TOOL_VERSION, EXEMPLAR_ITF, ITF_SCRATCH_DIR, hashSpec } from './gen.mjs';
 import { attribute, explain, humanBytes } from './budget.mjs';
 
 const cap = (s) => s.charAt(0).toUpperCase() + s.slice(1);
@@ -29,7 +29,12 @@ export function checkModel(model, root) {
 
   if (!fs.existsSync(fixtureDir)) {
     problems.push(`no fixtures at ${path.relative(root, fixtureDir)} - run \`quint-sol-connect gen ${model.name}\``);
-    return { problems, fixtures: 0 };
+    // Zeros, not absent fields. The caller sums `bytes` and `cap` across specs
+    // to police the global total, and one `undefined` makes that sum NaN - at
+    // which point `allocated > total` is false and the ceiling silently stops
+    // applying to every *other* spec. A spec that has never been generated is
+    // the likeliest way to reach this, so it has to be the safe direction.
+    return { problems, warnings: [], fixtures: 0, bytes: 0, cap: model.maxBytes };
   }
 
   const fixtures = fs
@@ -45,7 +50,30 @@ export function checkModel(model, root) {
   // change hits all of them at once. Reported once with a count, rather than
   // once per file, so the actual problem is not buried in its own repetition.
   const schemaDrift = [];
+  const specDrift = [];
+  const runDrift = new Map();
+  const runMissing = new Set();
   const versionDrift = new Map();
+
+  // The schema hash covers the config's state shape and action names. It does
+  // not cover the model itself, nor the parameters of the run that sampled it -
+  // and every one of those changes which traces the committed blobs hold. Left
+  // uncompared, a spec could be rewritten, or the seed changed, and `check`
+  // would still report ok against traces describing the previous version.
+  let specHash = null;
+  try {
+    specHash = hashSpec(root, model.specPath);
+  } catch (e) {
+    problems.push(`cannot read ${model.specPath} to hash it: ${e.message}`);
+  }
+  const expectedRun = {
+    seed: String(model.run.seed ?? ''),
+    traces: model.run.traces,
+    maxSteps: model.run.maxSteps,
+    maxSamples: model.run.maxSamples,
+    invariant: model.run.invariant ?? '',
+    backend: model.run.backend ?? 'rust',
+  };
   const observed = new Map();
   const exemplars = [];
 
@@ -70,6 +98,17 @@ export function checkModel(model, root) {
     }
     if (meta.spec !== model.specPath) {
       problems.push(`${f}: generated from ${meta.spec}, config now says ${model.specPath}`);
+    }
+    // Every fixture in a directory is generated from one spec by one run, so
+    // these hold for all of them at once. Collected and reported once, the way
+    // the schema and version drift above are.
+    if (meta.specHash !== specHash) specDrift.push(meta.specHash ?? null);
+    for (const [key, want] of Object.entries(expectedRun)) {
+      // A key the fixture does not carry at all predates this check; that is
+      // one fact about the fixture, not one per parameter, so it is collected
+      // separately rather than reported six times as `undefined`.
+      if (!(key in meta)) runMissing.add(key);
+      else if (meta[key] !== want) runDrift.set(key, { was: meta[key], now: want });
     }
     if (typeof fixture.steps !== 'string' || !fixture.steps.startsWith('0x')) {
       problems.push(`${f}: "steps" is not a hex blob`);
@@ -111,6 +150,33 @@ export function checkModel(model, root) {
       `${schemaDrift.length} of ${fixtures.length} fixtures carry schema hash ` +
         `${JSON.parse(fs.readFileSync(path.join(fixtureDir, schemaDrift[0]), 'utf8')).meta.schemaHash}, ` +
         `but the config now yields ${model.schemaHash}. The state or action shape changed.`,
+    );
+  }
+  if (specDrift.length) {
+    // A fixture generated before spec hashing existed carries no hash at all,
+    // which is a different statement from "the spec changed": nothing is known
+    // either way. Saying the spec changed would be a guess presented as a fact.
+    problems.push(
+      specDrift[0] === null
+        ? `${specDrift.length} fixture(s) carry no spec hash - they predate it, so whether ` +
+          `${model.specPath} still describes them is unknown. Regenerate.`
+        : `${model.specPath} has changed since these ${specDrift.length} fixture(s) were ` +
+          `generated (they record ${String(specDrift[0]).slice(0, 10)}, the file on disk now ` +
+          `hashes to ${String(specHash).slice(0, 10)}). The committed traces describe the ` +
+          'previous model.',
+    );
+  }
+  if (runMissing.size) {
+    problems.push(
+      `the fixtures record no ${[...runMissing].map((k) => `run.${k}`).join(', ')} - they predate ` +
+        'the check that compares run parameters against the config. Regenerate.',
+    );
+  }
+  for (const [key, { was, now }] of runDrift) {
+    problems.push(
+      `run.${key} is ${JSON.stringify(now)} in the config but the fixtures were generated with ` +
+        `${JSON.stringify(was)}. Every run parameter changes which traces come out, and none of ` +
+        'them changes the schema hash.',
     );
   }
   for (const [version, n] of versionDrift) {
