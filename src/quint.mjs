@@ -71,7 +71,7 @@ export function typecheck(bin, specPath, cwd) {
  *
  * @returns {{ files: string[], stdout: string }} absolute paths, trace order
  */
-export function generateTraces(bin, { cwd, specPath, outDir, traces, maxSteps, maxSamples, seed, invariant, mainModule }) {
+export function generateTraces(bin, { cwd, specPath, outDir, traces, maxSteps, maxSamples, seed, invariant, mainModule, backend }) {
   fs.rmSync(outDir, { recursive: true, force: true });
   fs.mkdirSync(outDir, { recursive: true });
 
@@ -87,6 +87,11 @@ export function generateTraces(bin, { cwd, specPath, outDir, traces, maxSteps, m
   if (seed !== null && seed !== undefined) args.push(`--seed=${seed}`);
   if (invariant) args.push(`--invariant=${invariant}`);
   if (mainModule) args.push(`--main=${mainModule}`);
+  // Quint's default evaluator is Rust, whose integers are i64. Any spec built
+  // on token magnitudes overflows that - `amountOut * price` at 18 decimals is
+  // past i64 before it is divided back down - and quint reports it as a runtime
+  // error rather than wrapping. The TypeScript backend uses bigints.
+  if (backend) args.push(`--backend=${backend}`);
 
   const stdout = run(bin, args, cwd);
 

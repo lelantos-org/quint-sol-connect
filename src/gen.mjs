@@ -129,6 +129,7 @@ export function generateSpec(model, { root, quintBin, quintVer, fresh, outOverri
       seed: run.seed,
       invariant: run.invariant,
       mainModule: model.module,
+      backend: run.backend,
     }));
 
     const fixtureDir = posix(
@@ -194,6 +195,9 @@ export function generateSpec(model, { root, quintBin, quintVer, fresh, outOverri
         spec: model.specPath,
         module: model.module ?? '',
         quintVersion: quintVer,
+        // The evaluator matters for reproducibility: the two backends do not
+        // draw the same traces from the same seed.
+        backend: run.backend ?? 'rust',
         toolVersion: TOOL_VERSION,
         seed: String(run.seed ?? ''),
         traceIndex: i,

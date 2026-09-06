@@ -35,7 +35,16 @@ export const DEFAULTS = {
   fixtureOut: 'test/fixtures/quint',
   freshOut: 'out/quint',
   pragma: '0.8.36',
-  run: { traces: 16, maxSteps: 20, maxSamples: 20000, seed: '0x1', invariant: null },
+  run: {
+    traces: 16,
+    maxSteps: 20,
+    maxSamples: 20000,
+    seed: '0x1',
+    invariant: null,
+    /// null = quint's default (`rust`). Set `'typescript'` for specs whose
+    /// arithmetic leaves i64 - the Rust evaluator refuses those outright.
+    backend: null,
+  },
 };
 
 /** Load `quint-sol-connect.config.mjs` (or `.json`) from `root`. */
