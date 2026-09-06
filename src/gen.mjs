@@ -143,6 +143,10 @@ export function generateSpec(model, { root, quintBin, quintVer, fresh, outOverri
         traceIndex: i,
         steps: trace.steps.length,
         actions: model.actions.map((a) => a.name),
+        // Per-action step counts, so `check` can enforce coverage floors
+        // without re-running quint. A trace set that quietly stops exercising
+        // an action still replays green - it just stops testing that action.
+        actionCounts: Object.fromEntries(counts),
         schemaHash: model.schemaHash,
         testName,
         itf: `${fixtureDir}/${itfName}`,

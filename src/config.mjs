@@ -145,6 +145,9 @@ export function buildModel(name, raw, config) {
     ignoreState,
     actions,
     picks,
+    /// Optional `{ minSteps: { action: n } }`. Enforced by `check`, not `gen`,
+    /// so it guards the committed traces rather than one run.
+    coverage: raw.coverage ?? null,
     qualify: (node) => qualified(node, lib),
   };
 
