@@ -8,6 +8,8 @@
  * choose the width and the ordering; v1 makes that choice explicit.
  */
 
+import { pascal } from './util.mjs';
+
 export class TypeError_ extends Error {
   constructor(message, path) {
     super(path ? `${message} (at ${path})` : message);
@@ -16,7 +18,46 @@ export class TypeError_ extends Error {
   }
 }
 
-const pascal = (s) => s.replace(/(^|[_-])(\w)/g, (_, __, c) => c.toUpperCase());
+const IDENT = /^[A-Za-z_$][A-Za-z0-9_$]*$/;
+
+/**
+ * Words solc 0.8.36 will not accept as a struct member or enum tag - checked
+ * against the compiler, not transcribed from the docs. A config name that is one of
+ * these used to go straight into the generated library and fail there, as a
+ * parser error pointing at generated code rather than at the config entry.
+ */
+const SOLIDITY_RESERVED = new Set(
+  (
+    'abstract after alias anonymous apply as assembly auto break byte bytes calldata case catch constant ' +
+    'constructor continue contract copyof default define delete do else emit enum event external ' +
+    'fallback false final for function if immutable implements import in indexed inline interface internal ' +
+    'is let library macro mapping match memory modifier mutable new null of override partial payable pragma ' +
+    'private promise public pure receive reference relocatable return returns sealed sizeof static ' +
+    'storage string struct supports switch this throw true try type typedef typeof unchecked unicode using ' +
+    'var view virtual while address bool int uint fixed ufixed wei gwei ether seconds minutes hours days weeks ' +
+    'years super hex'
+  ).split(' '),
+);
+const SIZED = /^(u?int\d+|bytes\d+|u?fixed\d+x\d+)$/;
+
+/** Reject a name the generated Solidity could not declare. */
+export function assertIdentifier(name, what, path) {
+  if (typeof name !== 'string' || !IDENT.test(name)) {
+    throw new TypeError_(`${what} ${JSON.stringify(name)} is not a valid Solidity identifier`, path);
+  }
+  if (SOLIDITY_RESERVED.has(name) || SIZED.test(name)) {
+    throw new TypeError_(`${what} "${name}" is a Solidity keyword or type name`, path);
+  }
+}
+
+/** Two fields of one struct with the same name do not compile. */
+function assertUniqueFields(fields, owner, path) {
+  const seen = new Set();
+  for (const f of fields) {
+    if (seen.has(f.name)) throw new TypeError_(`${owner} has two fields named "${f.name}"`, path);
+    seen.add(f.name);
+  }
+}
 
 const UINT = /^uint(\d+)$/;
 const INT = /^int(\d+)$/;
@@ -33,6 +74,7 @@ export class Decls {
   }
 
   struct(name, fields) {
+    if (this.enums.has(name)) throw new TypeError_(`"${name}" is declared as both an enum and a struct`);
     const existing = this.structs.get(name);
     const shape = fields.map((f) => `${f.name}:${f.node.solType}`).join(',');
     if (existing) {
@@ -48,6 +90,7 @@ export class Decls {
   }
 
   enum_(name, variants) {
+    if (this.structs.has(name)) throw new TypeError_(`"${name}" is declared as both a struct and an enum`);
     const existing = this.enums.get(name);
     if (existing) {
       if (existing.variants.join(',') !== variants.join(',')) {
@@ -114,6 +157,7 @@ export function resolveType(desc, decls, ctx) {
     // value is a record, so the generated Solidity reads as one row rather
     // than a key paired with a nested struct.
     const name = desc.entryName ?? `${pascal(hint)}Entry`;
+    assertIdentifier(name, 'map entry struct name', path);
     const fields =
       valueNode.kind === 'struct'
         ? [{ name: 'key', node: keyNode }, ...valueNode.fields]
@@ -121,6 +165,9 @@ export function resolveType(desc, decls, ctx) {
             { name: 'key', node: keyNode },
             { name: 'value', node: valueNode },
           ];
+    // The key is flattened in beside the record's own fields, so a record with
+    // a field of its own called `key` would declare it twice.
+    assertUniqueFields(fields, `map entry "${name}" (the key plus the value record's fields)`, path);
     const decl = decls.struct(name, fields);
     const entry = structNode(decl);
     return { ...arrayOf(entry, 'map'), keyNode, valueNode };
@@ -130,10 +177,23 @@ export function resolveType(desc, decls, ctx) {
     const spec = desc.record ?? desc.tuple;
     const from = desc.record !== undefined ? 'record' : 'tuple';
     const name = desc.name ?? pascal(hint);
-    const fields = Object.entries(spec).map(([fname, fdesc]) => ({
-      name: fname,
-      node: resolveType(fdesc, decls, { ...ctx, path: `${path}.${fname}`, hint: `${pascal(hint)}${pascal(fname)}` }),
-    }));
+    // Field names become struct members, so they have to be written down.
+    // `Object.entries` on an array would name them "0", "1", ...
+    if (!spec || typeof spec !== 'object' || Array.isArray(spec)) {
+      throw new TypeError_(
+        `${from} descriptor needs an object of named fields, e.g. { ${from}: { amount: 'uint256', ok: 'bool' } }` +
+          (from === 'tuple' ? '; tuple elements are matched by position, in the order the keys are written' : ''),
+        path,
+      );
+    }
+    assertIdentifier(name, `${from} struct name`, path);
+    const fields = Object.entries(spec).map(([fname, fdesc]) => {
+      assertIdentifier(fname, `${from} field`, `${path}.${fname}`);
+      return {
+        name: fname,
+        node: resolveType(fdesc, decls, { ...ctx, path: `${path}.${fname}`, hint: `${pascal(hint)}${pascal(fname)}` }),
+      };
+    });
     if (fields.length === 0) throw new TypeError_(`${from} "${name}" has no fields`, path);
     const decl = decls.struct(name, fields);
     return { ...structNode(decl), from };
@@ -144,7 +204,11 @@ export function resolveType(desc, decls, ctx) {
     if (!Array.isArray(variants) || variants.length === 0) {
       throw new TypeError_('variant descriptor needs a non-empty array of tag names', path);
     }
+    if (variants.length > 256) throw new TypeError_('a variant lowers to a uint8 and cannot have more than 256 tags', path);
+    if (new Set(variants).size !== variants.length) throw new TypeError_('variant tags must be unique', path);
     const name = desc.name ?? pascal(hint);
+    assertIdentifier(name, 'variant enum name', path);
+    for (const v of variants) assertIdentifier(v, 'variant tag', path);
     const decl = decls.enum_(name, variants);
     return {
       kind: 'enum',
@@ -153,6 +217,9 @@ export function resolveType(desc, decls, ctx) {
       userDefined: true,
       abiType: { type: 'uint8' },
       canonical: 'uint8',
+      // The tags are part of the signature even though the wire type is a bare
+      // `uint8`: reordering them repoints every value a fixture already holds.
+      signature: `uint8{${variants.join(',')}}`,
       sortable: true,
       variants,
     };
@@ -162,6 +229,11 @@ export function resolveType(desc, decls, ctx) {
 }
 
 function resolveScalar(name, path) {
+  const node = scalarNode(name, path);
+  return { ...node, signature: node.canonical };
+}
+
+function scalarNode(name, path) {
   if (name === 'bool') {
     return { kind: 'bool', solType: 'bool', abiType: { type: 'bool' }, canonical: 'bool', sortable: true };
   }
@@ -240,6 +312,7 @@ function structNode(decl) {
     userDefined: true,
     abiType: { type: 'tuple', components: decl.fields.map((f) => ({ name: f.name, ...f.node.abiType })) },
     canonical: `(${decl.fields.map((f) => f.node.canonical).join(',')})`,
+    signature: `(${decl.fields.map((f) => `${f.node.signature} ${f.name}`).join(',')})`,
     sortable: false,
   };
 }
@@ -255,6 +328,9 @@ function arrayOf(inner, origin) {
         ? { type: 'tuple[]', components: inner.abiType.components }
         : { type: `${inner.abiType.type}[]` },
     canonical: `${inner.canonical}[]`,
+    // A set and a list encode identically but differ in whether the generator
+    // sorted them, which decides what the driver's `_project` must return.
+    signature: origin === 'list' ? `${inner.signature}[]` : `${origin}(${inner.signature})`,
     sortable: false,
   };
 }

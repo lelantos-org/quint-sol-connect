@@ -14,6 +14,7 @@
 
 import { encodeAbiParameters } from 'viem';
 import { isUnit } from './itf.mjs';
+import { cap } from './util.mjs';
 
 export class LowerError extends Error {
   constructor(message, path) {
@@ -88,7 +89,7 @@ function lowerArray(node, v, path) {
   if (node.origin === 'set') {
     if (!v || v.__t !== 'set') bad(`expected a set, got ${describe(v)}`, path);
     const lowered = v.items.map((x, i) => lowerValue(node.inner, x, `${path}{${i}}`));
-    return sortCanonically(lowered, node.inner, path);
+    return sortIndices(lowered, node.inner).map((j) => lowered[j]);
   }
 
   // map: flatten each entry into the generated entry struct, then order by key
@@ -108,7 +109,7 @@ function lowerArray(node, v, path) {
   });
 
   const keys = rows.map((r) => r.key);
-  const order = sortIndices(keys, node.keyNode, path);
+  const order = sortIndices(keys, node.keyNode);
   for (let i = 1; i < order.length; i++) {
     if (compare(keys[order[i - 1]], keys[order[i]], node.keyNode) === 0) {
       bad(`duplicate map key ${keys[order[i]]}`, path);
@@ -193,17 +194,13 @@ function compare(a, b, node) {
   }
 }
 
-function sortIndices(values, node, path) {
+function sortIndices(values, node) {
   return values
     .map((_, i) => i)
     .sort((x, y) => {
       const c = compare(values[x], values[y], node);
       return c !== 0 ? c : x - y;
     });
-}
-
-function sortCanonically(values, node, path) {
-  return sortIndices(values, node, path).map((i) => values[i]);
 }
 
 /**
@@ -215,8 +212,15 @@ function sortCanonically(values, node, path) {
 export const PICKS_FILLER = 'unused';
 
 /**
- * Build the ABI parameter describing `Step[]`, plus the canonical type string
- * the generated Solidity hashes into `SCHEMA_HASH`.
+ * Build the ABI parameter describing `Step[]`, the canonical ABI type string,
+ * and the named signature the schema hash is taken over.
+ *
+ * `canonical` is what the bytes look like; `signature` is what they mean. Two
+ * `uint256` state variables swapped, two enum tags reordered or two record
+ * fields exchanged all leave `canonical` byte-identical while making every
+ * committed fixture decode into the wrong place, so the hash covers the names
+ * and tags too. It still omits struct and enum *type* names, which only exist
+ * in the generated Solidity and move no bytes.
  */
 export function stepArrayAbi(model) {
   const picks = {
@@ -244,26 +248,40 @@ export function stepArrayAbi(model) {
     ? `(${model.picks.flatMap((p) => ['bool', p.node.canonical]).join(',')})`
     : '(bool)';
   const postCanon = `(${model.state.map((s) => s.node.canonical).join(',')})`;
-  return { abi: step, canonical: `(uint8,${picksCanon},${postCanon})[]` };
+
+  const picksSig = model.picks.length
+    ? `(${model.picks.map((p) => `bool has${cap(p.name)},${p.node.signature} ${p.name}`).join(',')})`
+    : `(bool ${PICKS_FILLER})`;
+  const postSig = `(${model.state.map((s) => `${s.node.signature} ${s.name}`).join(',')})`;
+
+  return {
+    abi: step,
+    canonical: `(uint8,${picksCanon},${postCanon})[]`,
+    signature: `(uint8 action,${picksSig} picks,${postSig} post)[]`,
+  };
 }
 
-const cap = (s) => s.charAt(0).toUpperCase() + s.slice(1);
-
-/** Lower and ABI-encode one decoded trace. Returns a `0x`-prefixed blob. */
-export function encodeTrace(model, trace, { file = '<trace>' } = {}) {
+/**
+ * Lower and ABI-encode one decoded trace. Returns a `0x`-prefixed blob.
+ *
+ * `actionIndices` is what `indexActions` returns for this trace: one enum
+ * index per step. It is passed in rather than re-derived so the one place that
+ * explains an unmappable action name stays the only place that meets one.
+ */
+export function encodeTrace(model, trace, { file = '<trace>', actionIndices } = {}) {
   const { abi } = stepArrayAbi(model);
+
+  if (!Array.isArray(actionIndices) || actionIndices.length !== trace.steps.length) {
+    throw new LowerError(
+      `${file}: encodeTrace needs one action index per step. \`indexActions\` maps trace action ` +
+        'names onto the configured enum; pass its `indices` as `actionIndices`',
+    );
+  }
 
   assertEveryVarAccountedFor(model, trace, file);
 
-  const steps = trace.steps.map((step) => {
+  const steps = trace.steps.map((step, i) => {
     const where = `${file} step ${step.index} (${step.action})`;
-
-    if (typeof step.actionIndex !== 'number') {
-      throw new LowerError(
-        `${where}: step carries no actionIndex. \`indexActions\` maps trace action names onto the ` +
-          'configured enum and must run before `encodeTrace`',
-      );
-    }
 
     const picks = model.picks.length ? {} : { [PICKS_FILLER]: false };
     for (const p of model.picks) {
@@ -283,7 +301,7 @@ export function encodeTrace(model, trace, { file = '<trace>' } = {}) {
       post[s.name] = lowerValue(s.node, step.state[s.name], `${where} state ${s.name}`);
     }
 
-    return { action: step.actionIndex, picks, post };
+    return { action: actionIndices[i], picks, post };
   });
 
   return encodeAbiParameters([abi], [steps]);
@@ -333,8 +351,9 @@ function zeroFor(node) {
   switch (node.kind) {
     case 'uint':
     case 'int':
+      return 0n;
     case 'enum':
-      return node.kind === 'enum' ? 0 : 0n;
+      return 0;
     case 'bool':
       return false;
     case 'string':

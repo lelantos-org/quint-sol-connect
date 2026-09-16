@@ -10,15 +10,22 @@ import { Vm } from "forge-std/Vm.sol";
 /// are the fixed `meta` keys read below. Nothing parses the trace body: it is
 /// one `abi.decode` against the generated `Step[]` type.
 ///
-/// The verbatim ITF trace is committed next to every fixture and named by
-/// `meta.itf`, so the readable original is always one file away.
+/// One trace per spec - the exemplar - commits its verbatim ITF beside the
+/// fixtures and names it in `meta.itf`. Any other trace's ITF is one
+/// `quint-sol-connect gen --itf <n>` away.
 library QuintTrace {
     Vm private constant VM = Vm(address(uint160(uint256(keccak256("hevm cheat code")))));
+
+    /// The fixture encoding this library reads. Bumped together with
+    /// `FIXTURE_FORMAT_VERSION` in src/gen.mjs, so Solidity pinned by a git
+    /// submodule and a generator installed from npm that have drifted apart
+    /// fail by name instead of misreading each other's fixtures.
+    uint256 internal constant FORMAT_VERSION = 2;
 
     struct Meta {
         string spec;
         string quintVersion;
-        string toolVersion;
+        uint256 formatVersion;
         string seed;
         string itf;
         string testName;
@@ -42,7 +49,20 @@ library QuintTrace {
 
         meta.spec = VM.parseJsonString(json, ".meta.spec");
         meta.quintVersion = VM.parseJsonString(json, ".meta.quintVersion");
-        meta.toolVersion = VM.parseJsonString(json, ".meta.toolVersion");
+        meta.formatVersion =
+            VM.keyExistsJson(json, ".meta.formatVersion") ? VM.parseJsonUint(json, ".meta.formatVersion") : 0;
+        require(
+            meta.formatVersion == FORMAT_VERSION,
+            string.concat(
+                "quint-sol-connect: ",
+                path,
+                " is fixture format ",
+                VM.toString(meta.formatVersion),
+                " but this QuintTrace.sol reads format ",
+                VM.toString(FORMAT_VERSION),
+                ". Regenerate, or align the Solidity and npm versions of quint-sol-connect."
+            )
+        );
         meta.seed = VM.parseJsonString(json, ".meta.seed");
         // Only the exemplar trace commits an ITF companion; the rest are
         // regenerated on demand with `gen --itf <n>`. So this key is usually

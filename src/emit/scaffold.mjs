@@ -9,7 +9,7 @@
 
 import path from 'node:path';
 
-const cap = (s) => s.charAt(0).toUpperCase() + s.slice(1);
+import { cap, posix } from '../util.mjs';
 
 /// Solidity resolves a relative import against the importing file, not against
 /// the project root, so the path has to be computed from the driver's own
@@ -17,7 +17,7 @@ const cap = (s) => s.charAt(0).toUpperCase() + s.slice(1);
 function importPrefix(model) {
   const from = path.dirname(path.resolve('/', model.driver.path));
   const to = path.resolve('/', model.solidityOut);
-  const rel = path.relative(from, to).split(path.sep).join('/');
+  const rel = posix(path.relative(from, to));
   if (rel === '') return '.';
   return rel.startsWith('.') ? rel : `./${rel}`;
 }
@@ -47,9 +47,7 @@ export function emitDriverStub(model, runtimeImport) {
   L.push('        revert("TODO: deploy the system under test");');
   L.push('    }');
   L.push('');
-  L.push(`    function apply_(${model.lib}.Action action, ${model.lib}.Picks memory picks) external override {`);
-  L.push('        require(msg.sender == address(this), "self-call only");');
-  L.push('');
+  L.push(`    function _apply(${model.lib}.Action action, ${model.lib}.Picks memory picks) internal override {`);
   model.actions.forEach((a, i) => {
     const kw = i === 0 ? 'if' : '} else if';
     L.push(`        ${kw} (action == ${model.lib}.Action.${a.enumName}) {`);

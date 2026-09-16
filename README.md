@@ -13,7 +13,7 @@ quint run spec.qnt --mbt --out-itf
         |                                    (offline, node)
         v
 test/fixtures/quint/<spec>/trace-000.json      ABI-encoded steps
-test/fixtures/quint/<spec>/trace-000.itf.json  the verbatim ITF, for humans
+test/fixtures/quint/<spec>/exemplar.itf.json   one verbatim ITF, for humans
 test/quint/generated/*.sol                     types + replay loop + one test per trace
         |                                    (forge test - no node, no quint)
         v
@@ -117,8 +117,7 @@ abstract contract CounterReplay is CounterSpecReplay {
         counter = new Counter();
     }
 
-    function apply_(CounterSpec.Action action, CounterSpec.Picks memory picks) external override {
-        require(msg.sender == address(this), "self-call only");
+    function _apply(CounterSpec.Action action, CounterSpec.Picks memory picks) internal override {
         if (action == CounterSpec.Action.Increment) counter.increment(picks.by);
         else if (action == CounterSpec.Action.Touch) counter.touch(picks.key);
         else if (action == CounterSpec.Action.Finish) counter.finish();
@@ -201,6 +200,10 @@ and `--samples` to override the config, plus two redirects:
   committed per-trace contract embeds fixture paths, so redirecting only the
   fixtures would leave the committed suite pointing at a temporary directory.
 
+The two are refused one without the other: `--out` alone would repoint the
+committed contract at the scratch fixtures, and `--sol-out` alone would write
+scratch fixtures over the committed ones.
+
 `scaffold` writes the driver once and refuses to overwrite it, because the
 driver is the one file you own. Every branch of the stub reverts rather than
 returning a default — an unfilled branch has to fail loudly, since a stub that
@@ -262,9 +265,12 @@ quint-sol-connect gen && git diff --exit-code
 them, without running quint at all. Three things are compared, because the
 fixtures have three inputs:
 
-- **The config shape**, via the schema hash. It covers the action names as well
-  as the type string, because reordering actions changes what each recorded
-  `uint8` tag means while leaving the canonical type byte-identical.
+- **The config shape**, via the schema hash. It is taken over a *named*
+  signature - state variable names, record field names, enum tags, action
+  names - not just the ABI type string. Swapping two `uint256` variables,
+  reordering an enum's tags or reordering actions all leave the wire type
+  byte-identical while changing what every committed byte means. Struct and
+  enum *type* names are left out; they move no bytes.
 - **The spec text**, via a hash of the `.qnt` file. The schema hash does not
   cover the model at all, so without this a spec could be rewritten from top to
   bottom and `check` would still report ok, against traces describing the
@@ -274,8 +280,19 @@ fixtures have three inputs:
   `invariant`, `backend`. Every one of them changes which traces come out and
   none of them touches the schema hash.
 
-The `gen && git diff --exit-code` gate above catches all three too, but it needs
-node and quint. `check` needs neither, which is the point of it.
+It also re-emits the generated Solidity and compares the content hash each file
+carries in its header, which survives `forge fmt`. That covers what the fixtures
+do not: `pragma`, `ignoreState` reasons, the `--runtime` import prefix (pass the
+same one to `check`), the driver, and a tool upgrade that changed the emitted
+code.
+
+Fixtures record a *format* version rather than the package version, so a
+release that did not change the encoding does not make every consumer
+regenerate. `QuintTrace.sol` checks the same number, which catches Solidity
+pinned by submodule and a generator from npm that have drifted apart.
+
+The `gen && git diff --exit-code` gate above catches all of this too, but it
+needs quint. `check` needs only node, which is the point of it.
 
 For a nightly sweep with real randomness, point a fresh run at scratch paths so
 it cannot disturb any of that:
@@ -284,6 +301,28 @@ it cannot disturb any of that:
 quint-sol-connect gen --fresh --out .scratch/fixtures --sol-out .scratch/sol
 forge test --match-path ".scratch/sol/**"
 ```
+
+## Other config
+
+Top-level keys besides `specs`:
+
+| key | default | |
+| --- | --- | --- |
+| `quintBin` | `null` | path to a quint binary. `null` runs the copy this package depends on, found through node's module resolution, then `quint` on PATH |
+| `solidityOut`, `fixtureOut`, `pragma` | `test/quint/generated`, `test/fixtures/quint`, `0.8.36` | overridable per spec |
+| `format` | `true` | `false` skips running `forge fmt` over generated Solidity |
+| `failOnDeadAction` | `false` | make `gen` exit non-zero when a configured action never ran |
+| `budget` | `{ totalBytes: 12_000_000, defaultMaxBytes: 512_000 }` | see [Bytes](#bytes) |
+
+Per spec, besides what the example shows: `module` (quint `--main`),
+`run.backend` (`'typescript'` for arithmetic past i64), `ignoreState`
+(`{ var: 'reason' }`), `coverage.minSteps` (`{ action: n }`, enforced by
+`check`) and `budget`.
+
+Config names become Solidity identifiers, so `gen` rejects Solidity keywords,
+duplicate members and the names the generated library declares itself
+(`Action`, `State`, `Picks`, `Step`) by config path, rather than leaving
+`forge build` to fail inside generated code.
 
 ## Coverage
 
@@ -322,6 +361,7 @@ instead of decoding into nonsense.
 - `quint run` only — not `quint test` or `quint verify`.
 - Quint does not shrink, so a failing trace is as long as it was generated.
 - Replay needs `isolate = false`; the base contract checks and says so.
+- Node 20.10 or later, for JSON config files.
 - The spec's own `pure val` constants are not emitted, so a driver that needs one keeps its own copy. A disagreement shows up as a divergence rather than passing quietly, but it is a second copy.
 
 ## In practice

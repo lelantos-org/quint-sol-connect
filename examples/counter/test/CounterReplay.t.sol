@@ -23,9 +23,7 @@ abstract contract CounterReplay is CounterSpecReplay {
         // of every trace asserts that this is where the implementation starts.
     }
 
-    function apply_(CounterSpec.Action action, CounterSpec.Picks memory picks) external override {
-        require(msg.sender == address(this), "self-call only");
-
+    function _apply(CounterSpec.Action action, CounterSpec.Picks memory picks) internal override {
         if (action == CounterSpec.Action.Increment) {
             counter.increment(picks.by);
         } else if (action == CounterSpec.Action.Touch) {

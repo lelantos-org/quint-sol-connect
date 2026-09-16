@@ -16,9 +16,7 @@ import os from 'node:os';
 import path from 'node:path';
 
 import { buildModel } from '../../src/config.mjs';
-import { TOOL_VERSION, EXEMPLAR_ITF, hashSpec } from '../../src/gen.mjs';
-
-const cap = (s) => s.charAt(0).toUpperCase() + s.slice(1);
+import { FIXTURE_FORMAT_VERSION, EXEMPLAR_ITF, emitSolidity, hashSpec } from '../../src/gen.mjs';
 
 export const DEMO_SPEC_TEXT = 'module demo { var n: int action init = n\' = 0 }\n';
 
@@ -66,21 +64,26 @@ export function fixtureTree({
   if (exemplar) fs.writeFileSync(path.join(dir, EXEMPLAR_ITF), '{}');
   if (extraItf) fs.writeFileSync(path.join(dir, extraItf), '{}');
 
-  const gen = path.join(root, model.solidityOut);
-  fs.mkdirSync(gen, { recursive: true });
-  fs.writeFileSync(
-    path.join(gen, `${model.lib}.sol`),
-    `library ${model.lib} { bytes32 internal constant SCHEMA_HASH = ${model.schemaHash}; }`,
-  );
-  fs.writeFileSync(path.join(gen, `${cap(name)}SpecReplay.sol`), '');
-  // `check` also verifies every fixture is replayed by a test, so the stub has
-  // to name the fixture path the way the generator would.
-  fs.writeFileSync(
-    path.join(gen, `${cap(name)}Traces.t.sol`),
-    `function test_quint_${name}_000() public { _replay("${model.fixtureOut}/${name}/trace-000.json"); }`,
-  );
+  for (const [rel, text] of Object.entries(generatedSolidity(model, name))) {
+    fs.mkdirSync(path.dirname(path.join(root, rel)), { recursive: true });
+    fs.writeFileSync(path.join(root, rel), text);
+  }
 
   return { model, root, dir, specAbs };
+}
+
+/**
+ * The generated Solidity for a tree holding the single fixture `trace-000`,
+ * keyed by path relative to the root. Real emitter output, because `check`
+ * re-emits it and compares content hashes.
+ */
+export function generatedSolidity(model, name = model.name) {
+  const fixtures = [{ testName: `test_quint_${name}_000`, path: `${model.fixtureOut}/${name}/trace-000.json` }];
+  return Object.fromEntries(
+    emitSolidity(model, { runtimeImport: 'quint-sol-connect', fixtures, solDir: model.solidityOut }).map(
+      ({ file, text }) => [file.split(path.sep).join('/'), text],
+    ),
+  );
 }
 
 /**
@@ -96,7 +99,7 @@ export function fixtureMeta(model, root, name = model.name) {
     module: model.module ?? '',
     quintVersion: '0.32.0',
     backend: model.run.backend ?? 'rust',
-    toolVersion: TOOL_VERSION,
+    formatVersion: FIXTURE_FORMAT_VERSION,
     seed: String(model.run.seed ?? ''),
     traces: model.run.traces,
     maxSteps: model.run.maxSteps,

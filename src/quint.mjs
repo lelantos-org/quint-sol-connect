@@ -9,11 +9,10 @@
 
 import { spawnSync } from 'node:child_process';
 import fs from 'node:fs';
+import { createRequire } from 'node:module';
 import path from 'node:path';
-import { fileURLToPath } from 'node:url';
 
-const HERE = path.dirname(fileURLToPath(import.meta.url));
-const PKG_ROOT = path.resolve(HERE, '..');
+const require_ = createRequire(import.meta.url);
 
 export class QuintError extends Error {
   constructor(message) {
@@ -22,33 +21,65 @@ export class QuintError extends Error {
   }
 }
 
-/** Locate the quint binary: bundled first, then PATH. */
-export function resolveQuint(override) {
+/**
+ * The quint CLI to run, as `{ command, prefix }`: `command` is spawned with
+ * `prefix` in front of quint's own arguments.
+ *
+ * The bundled copy is found through node's module resolution rather than at a
+ * fixed `node_modules/.bin` path under this package. A consumer's `npm install`
+ * hoists quint to *their* top-level `node_modules`, so the fixed path missed it
+ * and the lookup fell through to whatever `quint` was on PATH - possibly a
+ * different version from the one pinned here, which changes the traces a seed
+ * produces.
+ *
+ * @param {string|null} override `quintBin` from the config
+ * @param {() => string|null} [bundled] test seam; returns the bundled CLI script
+ */
+export function resolveQuint(override, bundled = bundledQuintScript) {
   if (override) {
     if (!fs.existsSync(override)) throw new QuintError(`quintBin "${override}" does not exist`);
-    return override;
+    return { command: override, prefix: [] };
   }
-  const bundled = path.join(PKG_ROOT, 'node_modules', '.bin', 'quint');
-  if (fs.existsSync(bundled)) return bundled;
+  const script = bundled();
+  // Run the script with this node, rather than through a `.bin` shim, so it
+  // works the same on Windows and needs nothing on PATH.
+  if (script) return { command: process.execPath, prefix: [script] };
 
   const probe = spawnSync('quint', ['--version'], { encoding: 'utf8' });
-  if (probe.status === 0) return 'quint';
+  if (probe.status === 0) return { command: 'quint', prefix: [] };
 
   throw new QuintError(
-    'quint not found. It ships as a dependency of this package: run `npm ci` in ' +
-      `${PKG_ROOT}, or install @informalsystems/quint and put it on PATH`,
+    'quint not found. It ships as a dependency of this package (@informalsystems/quint): ' +
+      'reinstall it, or set `quintBin` in the config',
   );
 }
 
+function bundledQuintScript() {
+  try {
+    const pkgJson = require_.resolve('@informalsystems/quint/package.json');
+    const { bin } = JSON.parse(fs.readFileSync(pkgJson, 'utf8'));
+    const rel = typeof bin === 'string' ? bin : bin?.quint;
+    if (!rel) return null;
+    const script = path.resolve(path.dirname(pkgJson), rel);
+    return fs.existsSync(script) ? script : null;
+  } catch {
+    return null;
+  }
+}
+
+/** Printable form of a resolved quint, for error messages. */
+const shown = (bin) => (bin.prefix.length ? `quint (${bin.prefix[0]})` : bin.command);
+
 export function quintVersion(bin) {
-  const r = spawnSync(bin, ['--version'], { encoding: 'utf8' });
-  if (r.status !== 0) throw new QuintError(`\`${bin} --version\` failed: ${r.stderr || r.stdout}`);
+  const r = spawnSync(bin.command, [...bin.prefix, '--version'], { encoding: 'utf8' });
+  if (r.error) throw new QuintError(`failed to run ${shown(bin)}: ${r.error.message}`);
+  if (r.status !== 0) throw new QuintError(`\`${shown(bin)} --version\` failed: ${r.stderr || r.stdout}`);
   return r.stdout.trim();
 }
 
 function run(bin, args, cwd) {
-  const r = spawnSync(bin, args, { cwd, encoding: 'utf8' });
-  if (r.error) throw new QuintError(`failed to run ${bin}: ${r.error.message}`);
+  const r = spawnSync(bin.command, [...bin.prefix, ...args], { cwd, encoding: 'utf8' });
+  if (r.error) throw new QuintError(`failed to run ${shown(bin)}: ${r.error.message}`);
   if (r.status !== 0) {
     throw new QuintError(
       `\`quint ${args.join(' ')}\` exited ${r.status}\n${r.stdout ?? ''}${r.stderr ?? ''}`,

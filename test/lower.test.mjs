@@ -151,7 +151,6 @@ test('an encoded step round-trips through the ABI', async () => {
         index: 0,
         action: 'step',
         isInitial: true,
-        actionIndex: 0,
         picks: {},
         state: { count: 0n, status: variant('Idle'), seen: set() },
       },
@@ -159,13 +158,12 @@ test('an encoded step round-trips through the ABI', async () => {
         index: 1,
         action: 'go',
         isInitial: false,
-        actionIndex: 0,
         picks: { by: { present: true, value: 5n } },
         state: { count: 5n, status: variant('Done'), seen: set(5n) },
       },
     ],
   };
-  const blob = encodeTrace(model, trace);
+  const blob = encodeTrace(model, trace, { actionIndices: indexActions(model, trace, 'out0').indices });
   const [steps] = decodeAbiParameters([stepArrayAbi(model).abi], blob);
 
   assert.equal(steps.length, 2);

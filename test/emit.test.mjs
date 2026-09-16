@@ -4,7 +4,7 @@ import { decodeAbiParameters } from 'viem';
 
 import { buildModel } from '../src/config.mjs';
 import { stepArrayAbi, encodeTrace, LowerError } from '../src/lower.mjs';
-import { emitSpecLibrary, emitSpecReplay, emitTraces } from '../src/emit/solidity.mjs';
+import { emitSpecLibrary, emitSpecReplay, emitTraces, contentHash } from '../src/emit/solidity.mjs';
 import { emitDriverStub } from '../src/emit/scaffold.mjs';
 
 const model = (raw) =>
@@ -57,11 +57,11 @@ for (const [label, m] of [['with picks', WITH_PICKS], ['without picks', NO_PICKS
   test(`${label}: an encoded trace round-trips through the same ABI`, () => {
     const trace = {
       steps: [
-        { index: 0, actionIndex: 0, picks: {}, state: stateFor(m) },
-        { index: 1, actionIndex: 1, picks: picksFor(m), state: stateFor(m) },
+        { index: 0, picks: {}, state: stateFor(m) },
+        { index: 1, picks: picksFor(m), state: stateFor(m) },
       ],
     };
-    const blob = encodeTrace(m, trace);
+    const blob = encodeTrace(m, trace, { actionIndices: [0, 1] });
     const [steps] = decodeAbiParameters([stepArrayAbi(m).abi], blob);
     assert.equal(steps.length, 2);
     assert.equal(steps[1].action, 1);
@@ -77,7 +77,7 @@ const picksFor = (m) =>
     ]),
   );
 
-test('encodeTrace refuses a trace that indexActions has not run over', () => {
+test('encodeTrace refuses a trace without an action index per step', () => {
   const trace = { steps: [{ index: 0, action: 'init', picks: {}, state: stateFor(NO_PICKS) }] };
   assert.throws(() => encodeTrace(NO_PICKS, trace), (e) => e instanceof LowerError && /indexActions/.test(e.message));
 });
@@ -88,10 +88,10 @@ test('encodeTrace refuses a trace that indexActions has not run over', () => {
 // usual way this happens, since a ghost is added to the spec alone.
 test('encodeTrace refuses a trace carrying a variable the config never mentions', () => {
   const trace = {
-    steps: [{ index: 0, actionIndex: 0, picks: {}, state: { ...stateFor(NO_PICKS), ghostSeen: 0n } }],
+    steps: [{ index: 0, picks: {}, state: { ...stateFor(NO_PICKS), ghostSeen: 0n } }],
   };
   assert.throws(
-    () => encodeTrace(NO_PICKS, trace),
+    () => encodeTrace(NO_PICKS, trace, { actionIndices: [0] }),
     (e) => e instanceof LowerError && /ghostSeen/.test(e.message) && /ignoreState/.test(e.message),
   );
 });
@@ -103,9 +103,9 @@ test('a variable named under ignoreState is accepted and left out of the compari
     actions: { increment: {}, finish: {} },
   });
   const trace = {
-    steps: [{ index: 0, actionIndex: 0, picks: {}, state: { ...stateFor(m), ghostSeen: 7n } }],
+    steps: [{ index: 0, picks: {}, state: { ...stateFor(m), ghostSeen: 7n } }],
   };
-  const [steps] = decodeAbiParameters([stepArrayAbi(m).abi], encodeTrace(m, trace));
+  const [steps] = decodeAbiParameters([stepArrayAbi(m).abi], encodeTrace(m, trace, { actionIndices: [0] }));
   assert.deepEqual(Object.keys(steps[0].post), ['count']);
 });
 
@@ -218,7 +218,45 @@ test('the driver stub reverts in every branch rather than returning defaults', (
   assert.match(src, /revert\("TODO: increment\(picks\.by\)"\)/);
   assert.match(src, /revert\("TODO: finish\(\)"\)/);
   assert.match(src, /revert\("TODO: project implementation state"\)/);
-  assert.match(src, /require\(msg\.sender == address\(this\), "self-call only"\)/);
+  // The caller check lives in the generated `quintApply`, not in each driver.
+  assert.match(src, /function _apply\(DemoSpec\.Action action, DemoSpec\.Picks memory picks\) internal override \{/);
+  assert.doesNotMatch(src, /msg\.sender/);
+});
+
+test('the replay owns the external hop and its caller check', () => {
+  const src = emitSpecReplay(WITH_PICKS, 'gen', { runtimeImport: 'quint-sol-connect' });
+  assert.match(src, /function _apply\(DemoSpec\.Action action, DemoSpec\.Picks memory picks\) internal virtual;/);
+  assert.match(
+    src,
+    /function quintApply\([^)]*\) external \{\s*require\(msg\.sender == address\(this\), "quint-sol-connect: self-call only"\);\s*_apply\(action, picks\);/,
+  );
+  assert.match(src, /_dispatch\(abi\.encodeCall\(this\.quintApply, /);
+});
+
+// Equal encodings mean equal states; the per-field walk only exists to name a
+// difference, and it builds a label string for every element it visits.
+test('state comparison short-circuits on equal encodings unless every field was asked for', () => {
+  const src = emitSpecReplay(WITH_PICKS, 'gen', { runtimeImport: 'quint-sol-connect' });
+  assert.match(
+    src,
+    /if \(quintVerbose < 2 && keccak256\(abi\.encode\(model_\)\) == keccak256\(abi\.encode\(chain\)\)\) return;/,
+  );
+});
+
+// `check` compares this line rather than bytes, since `forge fmt` has rewritten
+// the committed file. It must move with anything emitted and nothing else.
+test('every emitted file carries a content hash that tracks what was emitted', () => {
+  const lib = (raw) => emitSpecLibrary(model({ state: { count: 'uint256' }, actions: { go: {} }, ...raw }), 'gen');
+  const base = contentHash(lib());
+  assert.match(base, /^0x[0-9a-f]{64}$/);
+  assert.notEqual(base, `0x${'0'.repeat(64)}`);
+  assert.equal(contentHash(lib()), base, 'stable for identical input');
+  assert.notEqual(contentHash(lib({ pragma: '0.8.30' })), base, 'moves with the pragma');
+  assert.notEqual(
+    contentHash(lib({ ignoreState: { ghost: 'a different reason' } })),
+    contentHash(lib({ ignoreState: { ghost: 'a reason' } })),
+    'moves with an ignoreState reason',
+  );
 });
 
 test('every emitted file carries the regeneration command in its header', () => {
